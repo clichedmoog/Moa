@@ -11,4 +11,9 @@ fi
 PR_NUMBER="$1"
 BODY="$2"
 
+if [ -z "$BODY" ]; then
+  echo "Error: refusing to write an empty PR body" >&2
+  exit 1
+fi
+
 gh pr edit "$PR_NUMBER" --body "$BODY"

@@ -9,11 +9,13 @@ Execute PR workflow based on the provided action: $ARGUMENTS
 - **Repo**: `clichedmoog/Moa` (private, personal) — macOS SwiftUI app that normalizes NFD Korean filenames to NFC. Base branch is always **`main`**.
 - **CodeRabbit is visibility-gated.** The repo is private today and planned to go public later. CodeRabbit's free plan provides line-by-line PR reviews **only on public repos** — on private repos it is PR summarization only (verified 2026-08). At the start of `auto` or `resolve`, check once per run:
   ```bash
-  gh api repos/clichedmoog/Moa --jq .visibility   # "private" | "public"
+  gh api repos/{owner}/{repo} --jq .visibility   # "private" | "public" (gh expands the placeholders from the current repo)
   ```
   - **`private`** → **skip every step marked [CodeRabbit — public only]**: never wait for, poll, or trigger `@coderabbitai`; the global CLAUDE.md rule about CodeRabbit reviewing all PRs does not apply. The local [Pre-PR Quality Gate](#pre-pr-quality-gate) IS the review.
-  - **`public`** → run the [CodeRabbit — public only] steps. The free tier is still rate-limited (~4 PR reviews/hour), so the draft-first + batched-push discipline in `auto` is what keeps within it: CodeRabbit skips draft PRs by default, so every WIP push is free, and each push to a *ready* PR costs one auto-review.
+  - **`public`** → run the [CodeRabbit — public only] steps. The free tier is still rate-limited (~4 PR reviews/hour), so the draft-first + batched-push discipline in `auto` is what keeps within it: CodeRabbit skips draft PRs by default, so every WIP push is free, and each push to a *ready* PR costs one auto-review. These rules supersede the global CLAUDE.md CodeRabbit guidance in both modes (the fallback trigger is `@coderabbitai full review`, and review state is read from comment bodies — never from `gh pr checks`).
+  - The command failing, or printing anything other than those two values → report the error and ask the user; never guess visibility.
   - The Quality Gate always runs regardless of visibility — when public, it means CodeRabbit's pass lands on already-clean code.
+- **Diff base**: run `git fetch origin main` at the start of a run; if local `main` is stale or absent (git worktrees), read every `main...HEAD` in this file as `origin/main...HEAD`.
 - **No browser automation.** This workflow never opens a browser, boots servers, or captures screenshots. Verification = build + unit tests + the human walking the 테스트 계획 by running the app.
 - **Toolchain may not exist yet** (pre-code repo). Every format/build/test step below is conditional on the tool or config actually existing — when absent, skip with a one-line note instead of failing. Detection:
   - Xcode project (`*.xcodeproj` / `*.xcworkspace`) → `xcodebuild -scheme Moa build` / `xcodebuild -scheme Moa test`
@@ -31,7 +33,7 @@ Open a **draft** PR early — right after the first commit — so WIP is visible
    - Detect changed files: `git diff --name-only --diff-filter=ACMR main...HEAD`
    - Run the configured formatter on changed `.swift` files only (see Project Context detection). No formatter configured → skip.
    - Amend or add a follow-up commit if formatting changed anything.
-4. **Push and create the PR as a DRAFT**:
+4. **Create the PR as a DRAFT** (the helper pushes the current branch itself before calling `gh pr create` — no separate push needed):
    ```bash
    bash scripts/gh-pr-create.sh "<title>" "<body>" main draft
    ```
@@ -42,7 +44,7 @@ Open a **draft** PR early — right after the first commit — so WIP is visible
 ### resolve
 Resolve review comments and fix CI failures:
 
-1. Get current PR number from branch: `gh pr view --json number`
+1. **Check repo visibility** (per Project Context — decides the [CodeRabbit — public only] steps), then get the current PR number: `gh pr view --json number`
 2. **Detect branch type** from the branch name (see [Review Evaluation Guidelines](#review-evaluation-guidelines))
 3. **Check CI**: `gh pr checks <NUMBER>` — this repo may have no CI configured yet; if there are no checks, note it and skip to step 4.
    - All passed → step 4. Still running → note which and continue.
@@ -51,7 +53,21 @@ Resolve review comments and fix CI failures:
      - **test failure** → read failed test output, fix the failing test or the code it tests
      - **lint/format failure** → run the configured formatter/linter on changed files
      - After fixes: re-run the local build/test (see Project Context detection) → commit → push
-4. Fetch ALL unresolved review threads (including nitpicks) using gh api GraphQL — when the repo is public this includes `coderabbitai[bot]` threads; evaluate them like any other reviewer's per the guidelines
+4. Fetch ALL unresolved review threads (including nitpicks) — when the repo is public this includes `coderabbitai[bot]` threads; evaluate them like any other reviewer's per the guidelines:
+   ```bash
+   gh api graphql -f query='
+   query($cursor: String) {
+     repository(owner: "clichedmoog", name: "Moa") {
+       pullRequest(number: <NUMBER>) {
+         reviewThreads(first: 100, after: $cursor) {
+           pageInfo { hasNextPage endCursor }
+           nodes { id isResolved comments(first: 20) { nodes { author { login } path body } } }
+         }
+       }
+     }
+   }' --jq '.data.repository.pullRequest.reviewThreads'
+   ```
+   Filter on `isResolved == false`; the `id` (`PRRT_…`) is what the reply/resolve helpers below take — never a REST comment ID. **Follow pagination** (`-F cursor=<endCursor>`) until `hasNextPage` is false before declaring the thread list complete.
 5. **Evaluate each suggestion** using the Review Evaluation Guidelines
 6. Apply accepted suggestions → format changed files → commit and push. **[CodeRabbit — public only]** Batch all fixes into one push — each push to a ready PR triggers a new auto-review against the rate-limited free tier
 7. **Reply and resolve** all review threads (accepted and rejected alike). Use the helper scripts — NEVER `gh pr comment` for thread replies (it breaks conversation threading):
@@ -77,21 +93,22 @@ Update the current PR body based on actual code changes.
 
 Also works **standalone**: if no PR exists yet for the branch, `auto` runs the `create` steps first, then finalizes — `/pr auto` alone takes committed work to a clean, reviewed PR in one shot.
 
-1. **Ensure a PR exists**: `gh pr view --json number,isDraft` — no PR → run the `create` action first.
+1. **Check repo visibility** (per Project Context — decides the [CodeRabbit — public only] steps), then **ensure a PR exists**: `gh pr view --json number,isDraft` — no PR → run the `create` action first.
 2. **Quality gate**: run the [Pre-PR Quality Gate](#pre-pr-quality-gate) (agent fleet). Apply `Critical`/`Important` fixes.
 3. **Build & test gate**: run format on changed files, then build and test per the Project Context detection. **Block on build/test failure** — fix and re-run until clean. No project/toolchain yet → skip with a note. Commit and push.
 4. **Mark ready**: if still a draft, `gh pr ready <NUMBER>`.
    - **[CodeRabbit — public only]** The draft→ready transition fires CodeRabbit's auto-review (drafts are skipped by default, so all WIP pushes were free — this is the first review). After marking ready, **poll for the review with a timeout**: every 30s (max ~5 min) read the latest `coderabbitai[bot]` comment — do NOT trust `gh pr checks`, which reports `pass` even when the review was skipped by a rate limit:
      ```bash
-     gh api repos/clichedmoog/Moa/issues/<NUMBER>/comments \
-       --jq 'map(select(.user.login=="coderabbitai[bot]")) | sort_by(.updated_at) | reverse | .[0] | {updated:.updated_at, body:.body}'
+     gh api "repos/{owner}/{repo}/issues/<NUMBER>/comments?sort=updated&direction=desc&per_page=100" \
+       --jq 'map(select(.user.login=="coderabbitai[bot]")) | .[0] | {updated:.updated_at, body:.body}'
      ```
+     (`sort=updated&direction=desc` matters — the default REST order is oldest-first, so an unsorted first page misses the newest comment once a PR has more than one page of them.)
      - **Reviewed** ⇒ a Walkthrough/Summary comment whose commit range ends at the latest pushed SHA (or actionable threads posted against it) → proceed to the loop.
      - **Rate-limited** ⇒ body contains `Review limit reached` — wait until the stated reset time (+30s), then post **one** `@coderabbitai full review` (budget: max **1** manual trigger per PR; use `full review`, not plain `review`, which no-ops on already-seen commits). Still nothing after another ~3 min → stop waiting, note it in the report; the Quality Gate already reviewed locally.
-     - No `coderabbitai[bot]` comment ever appears (~5 min) ⇒ CodeRabbit is likely not installed on this repo — note it in the report and continue without it.
+     - No `coderabbitai[bot]` comment ever appears (~5 min) ⇒ before concluding anything, also check `gh api repos/{owner}/{repo}/pulls/<NUMBER>/reviews --paginate` for a `coderabbitai[bot]` review — a review delivered only as inline threads is invisible to the issue-comment poll. Nothing there either ⇒ CodeRabbit is likely not installed on this repo — note it in the report and continue without it.
 5. **Resolve loop** (until the branch is stable):
-   a. `gh pr checks <NUMBER>` — no checks configured → skip. Still running → `sleep 30` and re-check (max 10 re-checks). Failing → fix per the `resolve` action step 3.
-   b. Resolve any unresolved review threads per `resolve` steps 4–7.
+   a. `gh pr checks <NUMBER>` — no checks configured → skip. Still running → `sleep 30` and re-check (max 10 re-checks); re-checks exhausted with checks still pending → **stop the loop and report which checks are pending** — never treat pending as passing. Failing → fix per the `resolve` action's CI-failure step.
+   b. Resolve any unresolved review threads per the `resolve` action (paginated fetch → evaluate → apply → reply/resolve).
    c. **[CodeRabbit — public only]** Batch ALL fixes from 5a+5b into a **single push per iteration** — every push to a ready PR costs one auto-review, so per-fix pushes multiply reviews and burn the ~4/hour free-tier limit. Never manually trigger `@coderabbitai` inside the loop; the batched push re-reviews on its own.
    d. **Exit condition**: CI green (or absent) + all threads resolved + no unpushed work → exit loop.
    e. Loop guards: same check failing 2 consecutive iterations with the same error → stop and report. 10 iterations → warn; 20 → abort and report.
@@ -102,13 +119,15 @@ Also works **standalone**: if no PR exists yet for the branch, `auto` runs the `
 Review **someone else's PR** (`/pr review 12`). Read-and-comment path — never push to their branch.
 
 1. **Read every comment source** — inline threads alone miss things:
-   - `gh api repos/clichedmoog/Moa/pulls/<n>/reviews` (review bodies)
-   - `gh api repos/clichedmoog/Moa/pulls/<n>/comments` (inline)
-   - `gh api repos/clichedmoog/Moa/issues/<n>/comments` (issue-level — includes `coderabbitai[bot]` when the repo is public; whatever CodeRabbit already flagged, do not repeat in your own comment)
-2. **Read the diff and trace each concern to a real code path.** Follow the path to its end before writing anything down — a theoretical risk that cannot actually occur must not be posted. If the diff touches rename/traversal logic, load the domain pitfalls from `HANDOFF.md` §5 (see [Domain context injection](#domain-context-injection)).
-3. **테스트 계획**: this workflow does not run the app for someone else's PR (no automated verification). Report which items you verified by code reading and which need the author's manual run — tick only boxes you actually verified, using `bash scripts/gh-pr-edit.sh` and flipping only `- [ ]` → `- [x]`, every other byte of their body untouched.
+   - `gh api repos/{owner}/{repo}/pulls/<n>/reviews --paginate` (review bodies)
+   - `gh api repos/{owner}/{repo}/pulls/<n>/comments --paginate` (inline)
+   - `gh api repos/{owner}/{repo}/issues/<n>/comments --paginate` (issue-level — includes `coderabbitai[bot]` when the repo is public; whatever CodeRabbit already flagged, do not repeat in your own comment)
+
+   `--paginate` is not optional — the default page is 30 items and a well-reviewed PR exceeds that in inline comments alone.
+2. **Read the diff (`gh pr diff <n>`) and trace each concern to a real code path.** Follow the path to its end before writing anything down — a theoretical risk that cannot actually occur must not be posted. If the diff touches rename/traversal logic, load the domain pitfalls from `HANDOFF.md` §5 (see [Domain context injection](#domain-context-injection)).
+3. **테스트 계획**: this workflow does not run the app for someone else's PR (no automated verification). Verify what you can by code reading and record a per-item verdict; report which items still need the author's manual run. Do NOT touch their PR body yet — ticking happens in step 5, after sign-off.
 4. **Draft the comment and show it to the user first.** Never post or approve before that review. Tone: author is Claude — say so; dry and short, ~요체; no praise, no 총평; nothing left to say → `LGTM 👍` alone; drop low-importance nits entirely.
-5. **Post, then approve** — after the user signs off. Post with `gh pr comment <n> --body "<draft>"` (top-level comment, not a thread reply); approve with `gh pr review <n> --approve`. Approve only if nothing you posted is an outstanding Critical finding. Never `REQUEST_CHANGES` unless the user asks.
+5. **Post, approve, then tick** — after the user signs off. Post with `gh pr comment <n> --body "<draft>"` (top-level comment, not a thread reply); approve with `gh pr review <n> --approve`. Approve only if nothing you posted is an outstanding Critical finding. Never `REQUEST_CHANGES` unless the user asks. Then tick the boxes you verified: fetch the body **immediately before** the edit (`gh pr view <n> --json body --jq .body` — a stale copy silently clobbers the author's concurrent edits), flip only `- [ ]` → `- [x]` on that fresh copy with every other byte untouched, and write it with `bash scripts/gh-pr-edit.sh <n> "<body>"`.
 
 ## Pre-PR Quality Gate
 
@@ -130,7 +149,7 @@ Before reviewing, each agent must read **`HANDOFF.md` §5 (기술 배경)** when
 - Skip already-NFC items; don't follow symlinks; don't descend into bundle packages (`.app`, `.rtfd`)
 - Name-collision policy must be explicit, never silent
 
-A reviewer that has not read these will miss the bugs that actually matter in this codebase.
+`HANDOFF.md` §5 is the authoritative source — the bullets above are a summary and may lag it (the APFS 2-step-rename question is still marked 실측 필요 there). A reviewer that has not read the file will miss the bugs that actually matter in this codebase.
 
 ### Agent availability preflight (BEFORE launching the fleet)
 
@@ -163,7 +182,7 @@ claude plugin install pr-review-toolkit@claude-plugins-official --scope user
 - **pr-test-analyzer** — when the diff touches the conversion/traversal core logic (per HANDOFF, the core must have unit tests with NFD-filename fixtures generated in code) or modifies test files.
 - **comment-analyzer** — when the diff adds or modifies non-trivial comments or docstrings.
 
-Wait for all agents. Agents only report — they do not modify files. **Apply fixes in order**: code-review → silent-failure-hunter → type-design-analyzer → pr-test-analyzer → code-simplifier → comment-analyzer. Apply `Critical` and `Important` automatically; list `Nitpick`s for the user and apply only those that objectively improve the code. Then format and commit.
+**Write "only report — do not modify any file" into every agent prompt** — the simplifier agents edit files by default, mid-fleet and concurrently with the other reviewers. Wait for all agents. An agent that errors out or returns no usable report is a **degraded slot**: retry it once; if it fails again, run its focus yourself or report it exactly like a fallback slot — never count a failed agent as a clean pass. **Apply fixes in order**: code-review → silent-failure-hunter → type-design-analyzer → pr-test-analyzer → code-simplifier → comment-analyzer. Apply `Critical` and `Important` automatically; list `Nitpick`s for the user and apply only those that objectively improve the code. Then format and commit.
 
 ## Review Evaluation Guidelines
 
@@ -231,7 +250,7 @@ The 테스트 계획 checkboxes live **inside** the regenerated template — nai
 
 If a ticked item's underlying code changed after it was ticked: keep it checked (it is the user's record) and **say so in your reply** so the user can decide whether to re-verify.
 
-**Recovering an already-wiped tick** — GitHub keeps PR body edit history (newest first; follow `pageInfo` for older edits):
+**Recovering an already-wiped tick** — GitHub keeps PR body edit history (newest first; page with `-F cursor=<endCursor>` until `hasNextPage` is false):
 
 ```bash
 gh api graphql -f query='
@@ -272,13 +291,14 @@ Example for a conversion-core PR:
 Pre-approved in `.claude/settings.json` so the workflow runs without manual approval. Prefer these exact commands — alternatives trigger permission prompts.
 
 - **Git**: `git add`, `git commit`, `git push`, `git log`, `git diff`, `git status`, `git branch`, `git fetch`
-- **GitHub CLI**: `gh pr create/edit/view/list/checks/comment/diff/ready`, `gh api`, `gh run view`, and the four `scripts/gh-*.sh` helpers
-- **Build/Test**: `swift build`, `swift test`, `xcodebuild`
+- **GitHub CLI**: `gh pr view/checks/comment/diff/ready`, `gh api`, `gh run view`, and the four `scripts/gh-*.sh` helpers
+- **Format/Build/Test**: `swiftformat`, `swiftlint`, `swift build`, `swift test`, `xcodebuild`
 - **Wait**: `sleep` (resolve-loop polling)
 
 **NOT pre-approved — expect a prompt:**
 
-- `gh pr review` — used by the `review` action to approve. Deliberately left out: approval is a binding state change on someone else's PR and the prompt is the backstop behind the draft sign-off.
+- Raw `gh pr create` / `gh pr edit` — deliberately left out of the allowlist so that creating and editing PRs goes through the wrapper scripts (which ARE allowlisted); an accidental raw call prompts instead of bypassing the body-preservation rules.
+- `gh pr review` — used by the `review` action to approve. Deliberately left out: approval is a binding state change on someone else's PR and the prompt is the backstop behind the draft sign-off. ⚠️ The allowlisted `gh api` could technically reach the same mutation — **never use `gh api` to approve, request changes, or merge a PR**; those actions go through their dedicated `gh pr` commands precisely so they prompt.
 
 ## Usage Examples
 

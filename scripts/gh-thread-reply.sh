@@ -11,6 +11,11 @@ fi
 THREAD_ID="$1"
 BODY="$2"
 
+if [ -z "$BODY" ]; then
+  echo "Error: refusing to post an empty reply" >&2
+  exit 1
+fi
+
 gh api graphql -f query='
 mutation($threadId: ID!, $body: String!) {
   addPullRequestReviewThreadReply(input: {pullRequestReviewThreadId: $threadId, body: $body}) {
