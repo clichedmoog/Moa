@@ -12,7 +12,6 @@ let package = Package(
     ],
     targets: [
         .target(name: "MoaKit", dependencies: ["ZIPFoundation"]),
-        .executableTarget(name: "SandboxProbe", dependencies: ["MoaKit"]),
         .testTarget(name: "MoaKitTests", dependencies: ["MoaKit"])
     ]
 )
