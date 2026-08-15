@@ -290,8 +290,8 @@ Example for a conversion-core PR:
 
 Pre-approved in `.claude/settings.json` so the workflow runs without manual approval. Prefer these exact commands — alternatives trigger permission prompts.
 
-- **Git**: `git add`, `git commit`, `git push`, `git log`, `git diff`, `git status`, `git branch`, `git fetch`
-- **GitHub CLI**: `gh pr view/checks/comment/diff/ready`, `gh api`, `gh run view`, and the four `scripts/gh-*.sh` helpers
+- **Git**: `git add`, `git commit`, `git push`, `git log`, `git diff`, `git status`, `git branch`, `git fetch`, and — for `/checkout-pr`, `/rebase`, and the `merge-pr` skill — `git stash`, `git checkout`/`git switch`, `git rebase`, `git rev-parse`, `git worktree list`
+- **GitHub CLI**: `gh pr view/checks/checkout/comment/diff/ready`, `gh api`, `gh run view`, and the four `scripts/gh-*.sh` helpers
 - **Format/Build/Test**: `swiftformat`, `swiftlint`, `swift build`, `swift test`, `xcodebuild`
 - **Wait**: `sleep` (resolve-loop polling)
 
