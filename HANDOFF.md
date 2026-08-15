@@ -2,6 +2,11 @@
 
 작성일: 2026-08-14
 
+> ⚠️ **이 문서는 2026-08-14 시점의 기록이며, 일부 내용이 실측으로 반증됐다.**
+> 최신 기준은 [`docs/superpowers/specs/2026-08-16-moa-design.md`](docs/superpowers/specs/2026-08-16-moa-design.md)다.
+> 특히 5번의 exFAT 거동(실제로는 NFD 강제)과 7번의 "Java 기반"(실제로는 Swift)은 틀렸다.
+> 5번의 ⚠️ 실측 항목은 해소됐다 — APFS는 임시 이름 경유가 불필요하다.
+
 ## 1. 한 줄 요약
 
 macOS에서 자소분리(유니코드 NFD)된 한글 파일명을 NFC로 정규화해주는 macOS 앱.
