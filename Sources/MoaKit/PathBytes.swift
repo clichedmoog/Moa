@@ -13,18 +13,32 @@ public struct PathBytes: Equatable, Hashable, Sendable {
 
     private static let separator = UInt8(ascii: "/")
 
+    /// 후행 구분자를 제거해 정규화한다. 경로가 정확히 `/` 뿐이면 그대로 둔다.
+    /// 내부(중간)의 바이트는 절대 건드리지 않는다 — 손상된 UTF-8 이나 내부의
+    /// 중복 구분자도 그대로 보존된다.
+    private static func canonicalize(_ bytes: [UInt8]) -> [UInt8] {
+        var end = bytes.count
+        while end > 1 && bytes[end - 1] == separator {
+            end -= 1
+        }
+        return Array(bytes[..<end])
+    }
+
+    /// 후행 구분자를 제거해 정규화한다 (경로가 정확히 `/` 뿐이면 예외).
     public init(_ bytes: [UInt8]) {
-        self.bytes = bytes
+        self.bytes = Self.canonicalize(bytes)
     }
 
+    /// 후행 구분자를 제거해 정규화한다 (경로가 정확히 `/` 뿐이면 예외).
     public init(_ string: String) {
-        self.bytes = Array(string.utf8)
+        self.bytes = Self.canonicalize(Array(string.utf8))
     }
 
-    /// 구분자 중복 없이 경로 요소를 잇는다.
+    /// 구분자 중복 없이 경로 요소를 잇는다. 빈 경로에 이어붙일 때는
+    /// 선행 구분자를 넣지 않는다.
     public func appending(_ component: [UInt8]) -> PathBytes {
         var result = bytes
-        if result.last != Self.separator {
+        if !result.isEmpty && result.last != Self.separator {
             result.append(Self.separator)
         }
         result.append(contentsOf: component)

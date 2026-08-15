@@ -19,7 +19,8 @@ enum TestSupport {
         let unique = "moa-test-\(function.hashValue.magnitude)-\(getpid())"
         let path = PathBytes(NSTemporaryDirectory()).appending(Array(unique.utf8))
         remove(path)
-        _ = path.withCString { mkdir($0, 0o755) }
+        let result = path.withCString { mkdir($0, 0o755) }
+        precondition(result == 0, "임시 디렉터리 생성 실패: errno=\(errno)")
         return path
     }
 
