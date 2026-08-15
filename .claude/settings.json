@@ -1,0 +1,31 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git add:*)",
+      "Bash(git branch:*)",
+      "Bash(git commit:*)",
+      "Bash(git diff:*)",
+      "Bash(git fetch:*)",
+      "Bash(git log:*)",
+      "Bash(git push:*)",
+      "Bash(git status:*)",
+      "Bash(gh api:*)",
+      "Bash(gh pr checks:*)",
+      "Bash(gh pr comment:*)",
+      "Bash(gh pr diff:*)",
+      "Bash(gh pr ready:*)",
+      "Bash(gh pr view:*)",
+      "Bash(gh run view:*)",
+      "Bash(bash scripts/gh-pr-create.sh:*)",
+      "Bash(bash scripts/gh-pr-edit.sh:*)",
+      "Bash(bash scripts/gh-thread-reply.sh:*)",
+      "Bash(bash scripts/gh-thread-resolve.sh:*)",
+      "Bash(swiftformat:*)",
+      "Bash(swiftlint:*)",
+      "Bash(swift build:*)",
+      "Bash(swift test:*)",
+      "Bash(xcodebuild:*)",
+      "Bash(sleep:*)"
+    ]
+  }
+}
