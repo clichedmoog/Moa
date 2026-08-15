@@ -95,6 +95,8 @@ final class TreeWalkerTests: XCTestCase {
     }
 
     /// 접근할 수 없는 디렉터리를 만나도 크래시하지 않고 나머지를 계속 처리해야 한다.
+    /// 그리고 그 실패는 조용히 사라지지 않고 `failures` 에 남아야 한다 —
+    /// 아니면 "안쪽에 남은 NFD 이름을 처리했다" 고 거짓 보고하는 셈이 된다.
     func testSurvivesUnreadableDirectory() {
         let locked = TestSupport.makeDir(named: Array("잠긴폴더".utf8), in: dir)
         TestSupport.makeFile(named: Array("정상.txt".utf8), in: dir)
@@ -104,5 +106,44 @@ final class TreeWalkerTests: XCTestCase {
         let result = TreeWalker.collect(from: [dir])
         let names = result.items.map { String(decoding: $0.path.lastComponent, as: UTF8.self) }
         XCTAssertTrue(names.contains("정상.txt"))
+        XCTAssertTrue(names.contains("잠긴폴더"), "디렉터리 자신은 여전히 이름 변환 대상이어야 한다")
+
+        let failure = result.failures.first { $0.path.lastComponent == Array("잠긴폴더".utf8) }
+        XCTAssertNotNil(failure)
+        XCTAssertEqual(failure?.reason, .unreadableDirectory)
+        XCTAssertNotEqual(failure?.errno, 0)
+    }
+
+    /// 존재하지 않는 루트는 조용히 사라지면 안 되고 `.inaccessible` 실패로 보고돼야 한다.
+    func testNonexistentRootProducesInaccessibleFailure() {
+        let missing = dir.appending(Array("없음".utf8))
+
+        let result = TreeWalker.collect(from: [missing])
+
+        XCTAssertTrue(result.items.isEmpty)
+        XCTAssertEqual(result.failures.count, 1)
+        XCTAssertEqual(result.failures.first?.reason, .inaccessible)
+        XCTAssertNotEqual(result.failures.first?.errno, 0)
+    }
+
+    /// 의도적 제외(skipped)와 의도치 않은 실패(failures)는 절대 섞이면 안 된다.
+    /// "건너뜀: 3" 이라는 보고에 "USB 드라이브를 못 읽었다" 가 숨어 있으면 안 된다.
+    func testSkippedAndFailuresAreDisjoint() {
+        let git = TestSupport.makeDir(named: Array(".git".utf8), in: dir)
+        TestSupport.makeFile(named: Array("HEAD".utf8), in: git)
+
+        let locked = TestSupport.makeDir(named: Array("잠긴폴더".utf8), in: dir)
+        _ = locked.withCString { chmod($0, 0o000) }
+        defer { _ = locked.withCString { chmod($0, 0o755) } }
+
+        let result = TreeWalker.collect(from: [dir])
+
+        XCTAssertTrue(result.skipped.contains { $0.reason == .hidden })
+        XCTAssertFalse(result.failures.contains { $0.path.lastComponent == Array(".git".utf8) },
+                        "의도적으로 건너뛴 숨김 항목이 failures 에 들어가면 안 된다")
+
+        XCTAssertTrue(result.failures.contains { $0.reason == .unreadableDirectory })
+        XCTAssertFalse(result.skipped.contains { $0.path.lastComponent == Array("잠긴폴더".utf8) },
+                        "읽기 실패한 디렉터리가 skipped 에 들어가면 안 된다")
     }
 }
