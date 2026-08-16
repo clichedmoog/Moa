@@ -1,0 +1,42 @@
+name: Moa
+options:
+  bundleIdPrefix: com.clichedmoog
+  deploymentTarget:
+    macOS: "13.0"
+  createIntermediateGroups: true
+
+packages:
+  MoaKit:
+    path: ..
+
+targets:
+  Moa:
+    type: application
+    platform: macOS
+    sources:
+      - path: Moa
+    dependencies:
+      - package: MoaKit
+        product: MoaKit
+    info:
+      path: Moa/Info.plist
+      properties:
+        CFBundleName: Moa
+        CFBundleDisplayName: 모아
+        CFBundleShortVersionString: "1.0"
+        CFBundleVersion: "1"
+        LSMinimumSystemVersion: "13.0"
+        LSApplicationCategoryType: public.app-category.utilities
+        NSHumanReadableCopyright: "Copyright © 2026"
+        NSPrincipalClass: NSApplication
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.clichedmoog.Moa
+        PRODUCT_NAME: Moa
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        ARCHS: $(ARCHS_STANDARD)
+        ONLY_ACTIVE_ARCH: "NO"
+        SWIFT_VERSION: "5.0"
+        CODE_SIGN_STYLE: Automatic
+        CODE_SIGN_IDENTITY: "-"

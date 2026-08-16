@@ -22,3 +22,7 @@ xcuserdata/
 *.p12
 *.provisionprofile
 .env
+
+# XcodeGen 생성물
+MoaApp/Moa.xcodeproj/
+MoaApp/Moa/Info.plist
