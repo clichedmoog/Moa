@@ -44,19 +44,50 @@ public enum ArchivePlacement {
         return parent.appending(Normalizer.normalized(path.lastComponent))
     }
 
+    /// 다른 볼륨으로의 복사. `rename(2)` 이 `EXDEV` 로 실패했을 때만 호출된다.
+    ///
+    /// 실패하면(디스크 가득 참, 미디어 분리 등) 목적지에 아무것도 남기지 않는다 —
+    /// 임시 파일을 거치는 설계 전체가 지키려는 안전을 이 마지막 한 칸에서도 지켜야
+    /// 한다. `open` 실패는 애초에 목적지를 건드리지 않았으므로 지울 것이 없고,
+    /// `write` 실패는 이미 `O_TRUNC` 로 기존 내용을 지운 뒤라 절반짜리 파일이 남을
+    /// 수 있다 — 두 경우 모두 같은 정리 경로를 타면 코드가 단순해진다.
+    ///
+    /// 남는 틈: 이 `unlink` 자체가 크래시나 정전으로 실행되지 못하면 잘린 파일이
+    /// 남는다. 같은 볼륨에 임시 파일을 만들고 `rename` 으로 교체하는 편(rename 은
+    /// 원자적이라 이 문제가 아예 없다)이 더 나은 해법이지만, 샌드박스에서는 사용자가
+    /// 저장 패널로 고른 항목의 **상위 디렉터리**에 대한 쓰기 권한이 보통 주어지지
+    /// 않는다(실측: `EPERM`) — 그래서 형제 임시 파일을 안정적으로 만들 수 없다.
+    /// 저장 패널의 권한 부여 범위가 상위 디렉터리까지 포함하는 것으로 확인되면
+    /// 다시 검토할 만하다.
     private static func copyAcrossVolumes(from temporary: URL, to target: PathBytes) throws {
-        let data = try Data(contentsOf: temporary)
-        let fd = target.withCString { open($0, O_CREAT | O_WRONLY | O_TRUNC, 0o644) }
-        guard fd >= 0 else { throw ArchivePlacementError.cannotPlace(errno: errno) }
-        defer { close(fd) }
+        do {
+            let data = try Data(contentsOf: temporary)
+            let fd = target.withCString { open($0, O_CREAT | O_WRONLY | O_TRUNC, 0o644) }
+            guard fd >= 0 else { throw ArchivePlacementError.cannotPlace(errno: errno) }
+            defer { close(fd) }
 
-        var written = 0
-        while written < data.count {
-            let count = data.withUnsafeBytes { raw -> Int in
-                write(fd, raw.baseAddress!.advanced(by: written), data.count - written)
+            var written = 0
+            while written < data.count {
+                let count = data.withUnsafeBytes { raw -> Int in
+                    write(fd, raw.baseAddress!.advanced(by: written), data.count - written)
+                }
+                if count < 0 {
+                    throw ArchivePlacementError.cannotPlace(errno: errno)
+                }
+                guard count > 0 else {
+                    // POSIX 는 count == 0 일 때 errno 를 보장하지 않는다 — 이전 호출의
+                    // 오래된 errno 를 잘못 읽지 않도록 고정된 값을 쓴다. 일반 파일
+                    // 에서는 애초에 일어나지 않아야 하는 상황이다.
+                    throw ArchivePlacementError.cannotPlace(errno: EIO)
+                }
+                written += count
             }
-            guard count > 0 else { throw ArchivePlacementError.cannotPlace(errno: errno) }
-            written += count
+        } catch {
+            // 위 do 블록 안 어떤 실패든 — open 실패, write 실패, 그 사이 무엇이든 —
+            // 목적지에 손상된 파일을 남기지 않는다. unlink 자체의 성공 여부는 따지지
+            // 않는다: 이미 원래 에러를 던지는 중이므로 정리 실패로 그걸 덮으면 안 된다.
+            _ = target.withCString { unlink($0) }
+            throw error
         }
         _ = temporary.withUnsafeFileSystemRepresentation { unlink($0!) }
     }
