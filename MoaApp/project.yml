@@ -40,3 +40,4 @@ targets:
         SWIFT_VERSION: "5.0"
         CODE_SIGN_STYLE: Automatic
         CODE_SIGN_IDENTITY: "-"
+        CODE_SIGN_ENTITLEMENTS: Moa/Moa.entitlements
