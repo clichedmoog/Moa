@@ -219,13 +219,15 @@ final class ZipWriterTests: XCTestCase {
                        "번들 내용물 각각이 아니라 번들 자체 하나만 기록돼야 한다")
     }
 
-    // MARK: - F1: 실패한 배치는 목적지에 아무것도 남기지 않는다
+    // MARK: - F1/F5: 실패한 배치는 목적지를 손댄 만큼만 정리한다
 
-    /// open 실패 경로. 목적지 디렉터리에 쓰기 권한이 없으면 copyAcrossVolumes 의
-    /// open() 이 실패한다. 이 경로는 애초에 아무것도 쓰지 않으므로 정리할 게 없지만,
-    /// "실패한 배치는 목적지에 아무것도 남기지 않는다"는 결과 자체는 이 테스트로도
-    /// 확인된다.
-    func testFailedCrossVolumeOpenLeavesNothingBehind() throws {
+    /// F5: open() 이 실패하는데 목적지에 이미 파일이 있으면(그 파일 자체가 읽기
+    /// 전용이라서, 담긴 디렉터리는 멀쩡히 쓰기 가능해도) 우리는 그 파일에 한 byte 도
+    /// 쓰지 못한다. 이때 "실패했으니 정리한다"며 그 파일을 지우면 사용자의 기존
+    /// 파일이 조용히 사라진다 — 손상된 zip 을 남기는 것보다 나쁘다: 손상된 파일은
+    /// 적어도 실패의 증거가 남지만, 조용히 지워진 원본은 복구할 수 없다. 디렉터리는
+    /// 쓰기 가능한 채로 둬서 실패 원인이 정확히 대상 파일 자체의 권한임을 분리한다.
+    func testFailedCrossVolumeOpenLeavesPreexistingDestinationUntouched() throws {
         guard let volume = HFSPlusTestVolume.make() else {
             throw XCTSkip("이 환경에서 hdiutil 로 볼륨을 만들거나 attach 할 수 없다")
         }
@@ -233,13 +235,16 @@ final class ZipWriterTests: XCTestCase {
 
         TestSupport.makeFile(named: Array("문서.txt".utf8), in: dir)
 
-        let readOnlyDir = TestSupport.makeDir(named: Array("readonly".utf8), in: volume.mountPoint)
-        defer { _ = readOnlyDir.withCString { chmod($0, 0o755) } }
-        guard readOnlyDir.withCString({ chmod($0, 0o555) }) == 0 else {
-            throw XCTSkip("이 환경에서 chmod 로 디렉터리를 읽기 전용으로 만들 수 없다")
+        // 한글이 아닌 ASCII 이름을 쓴다 — 이 테스트는 정규화가 아니라 권한 경계를
+        // 검증하는 것이므로 Foundation 의 NFD 파일명 문제와 뒤섞이지 않게 한다.
+        let target = TestSupport.makeFile(named: Array("existing.zip".utf8),
+                                          in: volume.mountPoint,
+                                          contents: "원래 내용")
+        defer { _ = target.withCString { chmod($0, 0o644) } }
+        guard target.withCString({ chmod($0, 0o444) }) == 0 else {
+            throw XCTSkip("이 환경에서 chmod 로 파일을 읽기 전용으로 만들 수 없다")
         }
 
-        let target = readOnlyDir.appending(Array("결과.zip".utf8))
         let targetURL = URL(fileURLWithPath: target.displayString)
 
         XCTAssertThrowsError(try ZipWriter.write(roots: [dir], to: targetURL)) { error in
@@ -248,8 +253,12 @@ final class ZipWriterTests: XCTestCase {
                 return
             }
         }
-        XCTAssertFalse(FileManager.default.fileExists(atPath: target.displayString),
-                       "배치 실패 후 목적지에 아무것도 남으면 안 된다")
+
+        XCTAssertTrue(FileManager.default.fileExists(atPath: target.displayString),
+                      "open 실패로 아무것도 쓰지 못했다면 기존 파일이 지워지면 안 된다")
+        let survivingContents = try String(contentsOf: targetURL, encoding: .utf8)
+        XCTAssertEqual(survivingContents, "원래 내용",
+                       "기존 파일의 내용도 손대지 않은 채 그대로 남아야 한다")
     }
 
     /// write 실패 경로(핵심). `RLIMIT_FSIZE` 로 이 프로세스가 만들 수 있는 파일
