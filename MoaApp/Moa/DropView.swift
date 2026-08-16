@@ -4,19 +4,29 @@ import UniformTypeIdentifiers
 
 struct DropView: View {
     @EnvironmentObject var coordinator: DropCoordinator
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isTargeted = false
     @State private var isHovering = false
+
+    private var borderAnimation: Animation? {
+        reduceMotion ? nil : .easeOut(duration: 0.15)
+    }
+
+    private var hoverAnimation: Animation? {
+        reduceMotion ? nil : .easeOut(duration: 0.18)
+    }
 
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 16)
-                .strokeBorder(style: StrokeStyle(lineWidth: 2, dash: [10, 6]))
+                .strokeBorder(style: StrokeStyle(lineWidth: isTargeted ? 3 : 2, dash: [10, 6]))
                 .foregroundStyle(isTargeted ? Color.accentColor : Color.secondary.opacity(0.4))
 
             VStack(spacing: 14) {
                 Image(systemName: "arrow.down.doc")
                     .font(.system(size: 44, weight: .light))
                     .foregroundStyle(isTargeted ? Color.accentColor : Color.secondary)
+                    .scaleEffect(isTargeted ? 1.08 : 1.0)
 
                 Text("파일이나 폴더를 여기에 놓으세요")
                     .font(.headline)
@@ -26,13 +36,18 @@ struct DropView: View {
                     .foregroundStyle(.secondary)
 
                 // 드롭이 어려운 사용자를 위한 대안. 선행 앱 Contact 의 UX 를 따른다.
-                if isHovering {
-                    Button("파일 선택…") { openPanel() }
-                        .buttonStyle(.borderedProminent)
-                }
+                // 항상 자리를 차지하되(opacity/offset 만 바꿔) 호버 시작·종료에
+                // 레이아웃이 튀지 않게 한다.
+                Button("파일 선택…") { openPanel() }
+                    .buttonStyle(.borderedProminent)
+                    .opacity(isHovering ? 1 : 0)
+                    .offset(y: isHovering ? 0 : 6)
+                    .allowsHitTesting(isHovering)
+                    .animation(hoverAnimation, value: isHovering)
             }
             .padding()
         }
+        .animation(borderAnimation, value: isTargeted)
         .padding(20)
         .frame(minWidth: 420, minHeight: 320)
         .onHover { isHovering = $0 }

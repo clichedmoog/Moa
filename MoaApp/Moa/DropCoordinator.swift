@@ -7,7 +7,9 @@ enum CoordinatorState: Sendable {
     case idle
     /// 변환 대상이 임계값을 넘어 사용자 확인을 기다리는 중.
     case confirming(NormalizationPreview)
-    case working
+    /// 진행 중 화면에 보여줄 문구. 오래 걸리는 작업이 멈춘 것처럼 보이지 않도록
+    /// 무엇이 처리되고 있는지 말해준다.
+    case working(String)
     case finished(MoaReport)
     case zipped(ZipResult, URL)
     case failed(String)
@@ -56,7 +58,7 @@ final class DropCoordinator: ObservableObject {
     /// 드롭된 항목을 NFC 이름의 ZIP 으로 묶는다.
     func makeZip(from urls: [URL], to destination: URL) {
         let roots = urls.map { PathBytes(Array($0.path.utf8)) }
-        state = .working
+        state = .working("압축하는 중…")
         Task {
             let next = await Self.buildZip(roots: roots, destination: destination)
             self.state = next
@@ -64,7 +66,9 @@ final class DropCoordinator: ObservableObject {
     }
 
     private func execute(_ preview: NormalizationPreview) {
-        state = .working
+        // targetCount 를 쓴다 — ConfirmView 가 보여준 숫자와 같은 숫자라야
+        // "확인창에서 본 개수"와 "지금 처리 중인 개수"가 사용자 눈에 다르게 안 보인다.
+        state = .working("\(preview.targetCount)개 항목의 이름을 바꾸는 중…")
         Task {
             let report = await Self.runOffMain(preview)
             self.state = .finished(report)
@@ -85,7 +89,7 @@ final class DropCoordinator: ObservableObject {
             state = .idle
             return
         }
-        state = .working
+        state = .working("압축 파일을 정리하는 중…")
         Task {
             let next = await Self.cleanOffMain(source: url, destination: destination)
             self.state = next
