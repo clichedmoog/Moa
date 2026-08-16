@@ -58,7 +58,7 @@ final class DropCoordinator: ObservableObject {
     /// 드롭된 항목을 NFC 이름의 ZIP 으로 묶는다.
     func makeZip(from urls: [URL], to destination: URL) {
         let roots = urls.map { PathBytes(Array($0.path.utf8)) }
-        state = .working("압축하는 중…")
+        state = .working("압축하는 중")
         Task {
             let next = await Self.buildZip(roots: roots, destination: destination)
             self.state = next
@@ -68,7 +68,8 @@ final class DropCoordinator: ObservableObject {
     private func execute(_ preview: NormalizationPreview) {
         // targetCount 를 쓴다 — ConfirmView 가 보여준 숫자와 같은 숫자라야
         // "확인창에서 본 개수"와 "지금 처리 중인 개수"가 사용자 눈에 다르게 안 보인다.
-        state = .working("\(preview.targetCount)개 항목의 이름을 바꾸는 중…")
+        // 앱의 어휘(모으다)를 따른다 — 버튼·진행 문구·결과 문구가 같은 동사를 쓴다.
+        state = .working("\(preview.targetCount)개를 모으는 중")
         Task {
             let report = await Self.runOffMain(preview)
             self.state = .finished(report)
@@ -89,7 +90,7 @@ final class DropCoordinator: ObservableObject {
             state = .idle
             return
         }
-        state = .working("압축 파일을 정리하는 중…")
+        state = .working("압축 파일을 정리하는 중")
         Task {
             let next = await Self.cleanOffMain(source: url, destination: destination)
             self.state = next

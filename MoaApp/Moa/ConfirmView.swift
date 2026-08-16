@@ -14,7 +14,7 @@ struct ConfirmView: View {
                 .font(.system(size: 40))
                 .foregroundStyle(.orange)
 
-            Text("\(preview.targetCount)개의 이름을 바꿉니다")
+            Text("\(preview.targetCount)개를 모읍니다")
                 .font(.title2.bold())
 
             Text("전체 \(preview.totalCount)개 항목을 확인했습니다.\n의도한 폴더가 맞는지 확인해 주세요.")
@@ -31,7 +31,7 @@ struct ConfirmView: View {
 
             HStack(spacing: 12) {
                 Button("취소", action: onCancel)
-                Button("변환", action: onConfirm)
+                Button("모으기", action: onConfirm)
                     .buttonStyle(.borderedProminent)
                     .keyboardShortcut(.defaultAction)
             }

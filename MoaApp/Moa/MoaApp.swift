@@ -46,8 +46,7 @@ struct RootView: View {
                     .transition(.opacity)
 
             case .working(let message):
-                ProgressView(message)
-                    .frame(minWidth: 420, minHeight: 320)
+                WorkingView(message: message)
                     .transition(.opacity)
 
             case .finished(let report):
@@ -70,6 +69,24 @@ struct RootView: View {
     }
 }
 
+/// `.working` 상태 화면. 서명 요소를 "모으는 중" 위치에 두고, 아래에 무엇이
+/// 처리되는지 말로 덧붙인다 — 빈 스피너만으로는 오래 걸리는 작업이 멈춘 것처럼
+/// 보인다.
+private struct WorkingView: View {
+    let message: String
+
+    var body: some View {
+        VStack(spacing: 14) {
+            GatherMark(phase: .gathering)
+            Text(message)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+        .padding(28)
+        .frame(minWidth: 420, minHeight: 320)
+    }
+}
+
 /// `.zipped` 상태 화면.
 ///
 /// `omitted` 는 흔한 일(`.DS_Store` 등)이라 접어두지만, `failed` (읽지 못해
@@ -82,15 +99,13 @@ private struct ZippedView: View {
 
     var body: some View {
         VStack(spacing: 14) {
-            Image(systemName: "checkmark.circle")
-                .font(.system(size: 40))
-                .foregroundStyle(.green)
-            Text("\(result.entryCount)개 항목을 묶었습니다")
+            GatherMark(phase: .settled)
+            Text("\(result.entryCount)개를 모았습니다")
                 .font(.title3.bold())
 
             if !result.failed.isEmpty {
                 VStack(alignment: .leading, spacing: 4) {
-                    Label("\(result.failureCount)개 항목을 읽지 못해 빠졌습니다",
+                    Label("\(result.failureCount)개는 모으지 못했습니다",
                           systemImage: "exclamationmark.triangle.fill")
                         .font(.subheadline.bold())
                         .foregroundStyle(.red)
@@ -114,7 +129,7 @@ private struct ZippedView: View {
             // `omitted` 에는 맥 전용 파일뿐 아니라 심볼릭 링크·번들·특수 파일도
             // 들어온다. 문구를 "맥 전용 파일"로 좁히면 거짓말이 된다.
             if !result.omitted.isEmpty {
-                DisclosureGroup("제외한 항목 \(result.omitted.count)개") {
+                DisclosureGroup {
                     VStack(alignment: .leading, spacing: 2) {
                         ForEach(Array(result.omitted.prefix(50).enumerated()), id: \.offset) { _, entry in
                             Text("\((entry.path as NSString).lastPathComponent) — \(entry.detail)")
@@ -127,6 +142,9 @@ private struct ZippedView: View {
                                 .foregroundStyle(.secondary)
                         }
                     }
+                } label: {
+                    Label("제외한 항목 \(result.omitted.count)개", systemImage: "minus.circle")
+                        .foregroundStyle(.orange)
                 }
                 .font(.subheadline)
             }

@@ -22,7 +22,7 @@ targets:
       path: Moa/Info.plist
       properties:
         CFBundleName: Moa
-        CFBundleDisplayName: 모아
+        CFBundleDisplayName: Moa
         CFBundleShortVersionString: "1.0"
         CFBundleVersion: "1"
         LSMinimumSystemVersion: "13.0"
