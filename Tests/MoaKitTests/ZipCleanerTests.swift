@@ -128,14 +128,21 @@ final class ZipCleanerTests: XCTestCase {
     }
 
     /// Zip Slip 방지. 디스크에 풀지 않으므로 경로 탈출이 불가능하다.
+    ///
+    /// 탈출 위치는 하드코딩한 `.deletingLastPathComponent()` 횟수가 아니라 **엔트리
+    /// 이름 자체를 목적지 디렉터리에 상대 적용해 표준화**해서 구한다. 이렇게 하면
+    /// 픽스처의 이름이나 `../` 깊이가 바뀌어도 검증이 저절로 따라간다 — 고정된
+    /// 깊이로 손으로 짚으면 픽스처가 바뀔 때 가드가 조용히 어긋난다.
     func testDoesNotWriteOutsideDestination() throws {
-        try makeArchive(entries: [("../../탈출.txt", "악성")])
+        let maliciousName = "../../탈출.txt"
+        try makeArchive(entries: [(maliciousName, "악성")])
 
         _ = try ZipCleaner.clean(archiveAt: source, to: destination)
 
-        XCTAssertFalse(FileManager.default.fileExists(
-            atPath: destination.deletingLastPathComponent()
-                .deletingLastPathComponent().appendingPathComponent("탈출.txt").path))
+        let escapePath = destination.deletingLastPathComponent()
+            .appendingPathComponent(maliciousName)
+            .standardizedFileURL
+        XCTAssertFalse(FileManager.default.fileExists(atPath: escapePath.path))
     }
 
     /// 인코딩 판정 2단계: UTF-8 로 디코드되지 않으면 CP949(윈도우 한국어판)를 시도한다.
@@ -157,6 +164,27 @@ final class ZipCleanerTests: XCTestCase {
         XCTAssertEqual(result.entryCount, 1)
         let names = try entryNameBytes(in: destination)
         XCTAssertEqual(names, [TestSupport.nfc("윈도우.txt")])
+    }
+
+    /// 인코딩 판정 3단계: UTF-8 도, CP949 도 아니면 이름을 지어내지 않고 원본을
+    /// 유지한다 — 단, 그 "원본"(`entry.path`)이 빈 문자열로 떨어지는 모순된 경우까지
+    /// 포함해서다.
+    ///
+    /// 이 엔트리는 UTF-8 플래그(일반 목적 비트 11)를 세운 채로 UTF-8 도 CP949 도
+    /// 아닌 원시 바이트를 이름으로 갖는다 — ZIPFoundation 의 `entry.path` 는 이 경우
+    /// `String(pathData:encoding:.utf8) ?? ""` 로 빈 문자열을 내놓는다. 엔트리는
+    /// 어차피 새 아카이브에 들어가야 하므로(제외 대상이 아니다), 빈 이름을 그대로
+    /// 쓰지 않고 원시 바이트에서 결정적으로 합성한 이름을 써야 한다.
+    func testFallsBackToPlaceholderWhenNameIsUndecodable() throws {
+        let nameBytes = Array("bad".utf8) + [0xFF, 0xFE] + Array(".txt".utf8)
+        try makeRawArchive(nameBytes: nameBytes, contents: "x", generalPurposeBitFlag: 2048)
+
+        let result = try ZipCleaner.clean(archiveAt: source, to: destination)
+
+        XCTAssertEqual(result.entryCount, 1, "제외 대상이 아니므로 그대로 담겨야 한다")
+        let names = try entryNameBytes(in: destination)
+        XCTAssertEqual(names.count, 1)
+        XCTAssertFalse(names[0].isEmpty, "이름 없는 엔트리를 만들면 안 된다")
     }
 
     // MARK: - 헬퍼
@@ -187,19 +215,22 @@ final class ZipCleanerTests: XCTestCase {
         }
     }
 
-    /// 표준 ZIP 형식을 바이트 단위로 직접 조립한다(UTF-8 플래그 꺼짐, STORED 압축, 항목 1개).
+    /// 표준 ZIP 형식을 바이트 단위로 직접 조립한다(STORED 압축, 항목 1개).
     ///
-    /// `ZIPFoundation` 의 쓰기 API 는 항상 이름을 UTF-8 로 인코딩하므로, CP949 원시
-    /// 바이트를 이름으로 가진 엔트리는 이 방법이 아니면 만들 수 없다. CRC-32 는 0으로
-    /// 둔다 — `ZipCleaner` 는 원본을 읽을 때 `skipCRC32: true` 를 쓰므로 검증하지 않는다.
-    private func makeRawArchive(nameBytes: [UInt8], contents: String) throws {
+    /// `ZIPFoundation` 의 쓰기 API 는 항상 이름을 UTF-8 로 인코딩하고 UTF-8 플래그를
+    /// 세우므로, 그 플래그가 꺼진(CP949 등 레거시 zip) 엔트리나 플래그는 섰지만
+    /// 원시 바이트가 실제로는 유효한 UTF-8 이 아닌 모순된 엔트리는 이 방법이
+    /// 아니면 만들 수 없다. CRC-32 는 0으로 둔다 — `ZipCleaner` 는 원본을 읽을 때
+    /// `skipCRC32: true` 를 쓰므로 검증하지 않는다.
+    private func makeRawArchive(nameBytes: [UInt8], contents: String,
+                                generalPurposeBitFlag: UInt16 = 0) throws {
         let payload = Data(contents.utf8)
         var data = Data()
 
         // Local File Header (30바이트 고정 필드 + 파일명)
         data.append(contentsOf: [0x50, 0x4B, 0x03, 0x04])   // local file header signature
         data.append(le16(20))                               // version needed to extract
-        data.append(le16(0))                                // general purpose bit flag (UTF-8 플래그 없음)
+        data.append(le16(generalPurposeBitFlag))             // general purpose bit flag
         data.append(le16(0))                                // compression method: stored
         data.append(le16(0))                                // last mod file time
         data.append(le16(0x21))                              // last mod file date (1980-01-01)
@@ -217,7 +248,7 @@ final class ZipCleanerTests: XCTestCase {
         data.append(contentsOf: [0x50, 0x4B, 0x01, 0x02])   // central directory signature
         data.append(le16(20))                               // version made by (upper byte 0 == MS-DOS)
         data.append(le16(20))                               // version needed to extract
-        data.append(le16(0))                                // general purpose bit flag
+        data.append(le16(generalPurposeBitFlag))             // general purpose bit flag
         data.append(le16(0))                                // compression method
         data.append(le16(0))                                // last mod file time
         data.append(le16(0x21))                              // last mod file date
