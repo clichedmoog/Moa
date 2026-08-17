@@ -21,6 +21,7 @@ targets:
     info:
       path: Moa/Info.plist
       properties:
+        CFBundleIconFile: AppIcon
         CFBundleName: Moa
         CFBundleDisplayName: Moa
         CFBundleShortVersionString: "1.0"

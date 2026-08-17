@@ -99,7 +99,8 @@ private struct ZippedView: View {
 
     var body: some View {
         VStack(spacing: 14) {
-            GatherMark(phase: .settled)
+            // 결과 화면이므로 자모 마크가 아니라 완료 표시를 쓴다.
+            DoneMark(outcome: result.failed.isEmpty ? .changed : .hadFailures)
             Text("\(result.entryCount)개를 모았습니다")
                 .font(.title3.bold())
 

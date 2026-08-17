@@ -39,6 +39,11 @@ struct GatherMark: View {
         static let scatteredOpacity: CGFloat = 0.4
         static let gatheredOpacity: CGFloat = 1.0
 
+        /// 마크가 차지하는 자리. 흩어진 상태의 바깥 끝(±55, ±30)에
+        /// 글자 반 폭을 더한 값이다. 여기를 줄이면 이웃 뷰가 자모를 덮는다.
+        static let markWidth: CGFloat = 150
+        static let markHeight: CGFloat = 96
+
         /// 자모마다 다른 단청 안료를 준다. **모였을 때만** 이 색이 오고,
         /// 흩어져 있을 땐 무채색이다 — 색이 오는 것 자체가 "모였다"는 신호가 된다.
         ///
@@ -117,7 +122,10 @@ struct GatherMark: View {
                 jamo(letter)
             }
         }
-        .frame(height: Tuning.fontSize + 30)
+        // `offset` 은 레이아웃 크기를 바꾸지 않는다 — 자모가 아무리 멀리 흩어져도
+        // SwiftUI 는 이 뷰를 글자 한 자 크기로 보고 이웃을 바짝 붙인다. 그래서
+        // 흩어진 상태가 실제로 차지하는 만큼을 폭으로도 직접 잡아준다.
+        .frame(width: Tuning.markWidth, height: Tuning.markHeight)
         // 각 화면의 문구가 이미 상태를 말로 전달한다 — 이 요소는 장식이 아니라
         // 시각적 서명이라 VoiceOver 에 중복으로 읽히지 않게 숨긴다.
         .accessibilityHidden(true)

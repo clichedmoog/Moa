@@ -51,14 +51,22 @@ struct ResultView: View {
         .frame(minWidth: 460, minHeight: 360)
     }
 
+    // 자모 마크 대신 완료 표시를 둔다. 그 마크가 하는 말은 "흩어진 것이 모인다"이고
+    // 그건 일이 벌어지는 동안 할 말이다. 여기서 필요한 건 끝났다는 신호뿐이고,
+    // 무슨 일이 있었는지는 아래 글이 말한다.
+    private var outcome: DoneMark.Outcome {
+        if !report.failed.isEmpty { return .hadFailures }
+        return report.hasChanges ? .changed : .nothingToDo
+    }
+
     private var header: some View {
-        HStack(spacing: 16) {
-            GatherMark(phase: .settled)
+        HStack(alignment: .center, spacing: 14) {
+            DoneMark(outcome: outcome)
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(report.hasChanges ? "\(report.renamed.count)개를 모았습니다"
                                        : "이미 모두 모아져 있습니다")
-                    .font(.title3.bold())
+                    .font(.title2.bold())
 
                 if report.alreadyNormalized > 0 {
                     Text("이미 정상인 항목 \(report.alreadyNormalized)개는 건드리지 않았습니다")
@@ -66,6 +74,7 @@ struct ResultView: View {
                         .foregroundStyle(.secondary)
                 }
             }
+            Spacer(minLength: 0)
         }
     }
 
