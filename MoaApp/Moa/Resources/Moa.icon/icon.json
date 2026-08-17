@@ -1,0 +1,36 @@
+{
+  "fill": "automatic",
+  "groups": [
+    {
+      "layers": [
+        {
+          "image-name": "fg.png",
+          "name": "단청 문양"
+        }
+      ],
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.45
+      },
+      "specular": true,
+      "translucency": {
+        "enabled": false,
+        "value": 0
+      }
+    },
+    {
+      "layers": [
+        {
+          "image-name": "bg.png",
+          "name": "석청 바탕"
+        }
+      ]
+    }
+  ],
+  "supported-platforms": {
+    "circles": [
+      "watchOS"
+    ],
+    "squares": "shared"
+  }
+}

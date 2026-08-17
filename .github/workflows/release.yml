@@ -1,0 +1,143 @@
+name: Release
+
+# 태그를 밀면 빌드·서명·공증·DMG 까지 한 번에 하고 GitHub Release 를 만든다.
+#
+#   git tag v1.0 && git push origin v1.0
+#
+# 수동 실행도 열어둔다 — 태그를 잘못 밀었을 때 지우고 다시 미는 것보다
+# 워크플로만 다시 돌리는 편이 낫다.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "버전 (예: 1.0). 비우면 태그에서 가져온다"
+        required: false
+
+# 이 워크플로는 서명 키를 다룬다. fork 에서 온 PR 은 Secrets 에 접근할 수 없고
+# (GitHub 기본 동작), 아래 조건으로 upstream 저장소에서만 돌게 한 번 더 막는다.
+permissions:
+  contents: write
+
+jobs:
+  release:
+    # 공개 저장소에서 남의 fork 가 태그를 밀어 키를 쓰게 두지 않는다.
+    if: github.repository == 'clichedmoog/Moa'
+    runs-on: macos-15
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # 사용자 입력을 run: 안에 직접 펼치지 않는다 — 셸 주입 경로가 된다.
+      # env 로 넘긴 뒤 셸 변수로만 다루고, 형식도 검사한다.
+      - name: 버전 정하기
+        id: version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          if [ -n "$INPUT_VERSION" ]; then
+            V="$INPUT_VERSION"
+          else
+            V="${GITHUB_REF_NAME#v}"
+          fi
+          case "$V" in
+            [0-9]*.[0-9]*) ;;
+            *) echo "::error::버전 형식이 아니다: $V"; exit 1 ;;
+          esac
+          echo "value=$V" >> "$GITHUB_OUTPUT"
+          echo "버전: $V"
+
+      - name: Xcode 선택
+        run: sudo xcode-select -s /Applications/Xcode_16.app || xcode-select -p
+
+      - name: XcodeGen 설치
+        run: brew install xcodegen
+
+      - name: 테스트
+        run: swift test
+
+      # 서명 키는 임시 키체인에만 둔다. 기본 로그인 키체인을 건드리지 않고,
+      # 잡이 끝나면 통째로 지운다 — 러너가 재사용되더라도 키가 남지 않는다.
+      - name: 서명 키체인 준비
+        env:
+          CERT_P12: ${{ secrets.SIGNING_CERTIFICATE_P12 }}
+          CERT_PASSWORD: ${{ secrets.SIGNING_CERTIFICATE_PASSWORD }}
+        run: |
+          KEYCHAIN="$RUNNER_TEMP/moa-signing.keychain-db"
+          KEYCHAIN_PASSWORD=$(uuidgen)
+          echo "KEYCHAIN=$KEYCHAIN" >> "$GITHUB_ENV"
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 3600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+
+          echo "$CERT_P12" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -k "$KEYCHAIN" \
+              -P "$CERT_PASSWORD" -T /usr/bin/codesign
+          rm -f "$RUNNER_TEMP/cert.p12"
+
+          # 중간 인증서가 없으면 신뢰 체인이 끊겨 "0 valid identities" 가 된다.
+          # 발급 당시 실제로 겪은 문제라 CI 에서도 반드시 함께 설치한다.
+          curl -sfL -o "$RUNNER_TEMP/g2.cer" https://www.apple.com/certificateauthority/DeveloperIDG2CA.cer
+          curl -sfL -o "$RUNNER_TEMP/root.cer" https://www.apple.com/certificateauthority/AppleRootCA-G2.cer
+          security import "$RUNNER_TEMP/g2.cer" -k "$KEYCHAIN"
+          security import "$RUNNER_TEMP/root.cer" -k "$KEYCHAIN"
+
+          # codesign 이 암호 프롬프트 없이 키를 쓰게 한다.
+          security set-key-partition-list -S apple-tool:,apple:,codesign: \
+              -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN" >/dev/null
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
+
+          echo "── 서명 신원 확인"
+          security find-identity -v -p codesigning "$KEYCHAIN"
+          security find-identity -v -p codesigning "$KEYCHAIN" | grep -q "Developer ID Application" \
+            || { echo "::error::Developer ID 신원을 찾지 못했다"; exit 1; }
+
+      - name: 공증 자격 증명 등록
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: |
+          xcrun notarytool store-credentials "MOA_NOTARY" \
+              --apple-id "$APPLE_ID" \
+              --team-id "$TEAM_ID" \
+              --password "$APP_PASSWORD" \
+              --keychain "$KEYCHAIN"
+
+      # 로컬에서 쓰는 스크립트를 그대로 돌린다. CI 전용 경로를 따로 두면
+      # 둘이 갈라져서 "로컬에선 되는데 CI 에선 안 된다"가 생긴다.
+      - name: 빌드·서명·공증·DMG
+        env:
+          MOA_KEYCHAIN: ${{ env.KEYCHAIN }}
+        run: ./Scripts/release.sh
+
+      - name: 결과 검증
+        run: |
+          DMG=$(ls .build/release-app/*.dmg)
+          echo "── $DMG"
+          xcrun stapler validate "$DMG"
+          hdiutil attach "$DMG" -nobrowse -quiet
+          APP=$(find /Volumes -maxdepth 2 -name "Moa.app" | head -1)
+          lipo -archs "$APP/Contents/MacOS/Moa" | tee /tmp/archs
+          grep -q arm64 /tmp/archs && grep -q x86_64 /tmp/archs \
+            || { echo "::error::Universal 바이너리가 아니다"; exit 1; }
+          spctl -a -vvv -t exec "$APP"
+          xcrun stapler validate "$APP"
+          hdiutil detach "$(dirname "$APP")" -quiet
+
+      - name: 릴리스 발행
+        uses: softprops/action-gh-release@v2
+        with:
+          files: .build/release-app/*.dmg
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+
+      # 성공하든 실패하든 키를 지운다.
+      - name: 키체인 정리
+        if: always()
+        run: |
+          security delete-keychain "$KEYCHAIN" 2>/dev/null || true
+          rm -f "$RUNNER_TEMP"/*.p12 "$RUNNER_TEMP"/*.cer
