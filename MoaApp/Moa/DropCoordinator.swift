@@ -36,6 +36,13 @@ final class DropCoordinator: ObservableObject {
     /// 만들기 요청이 그냥 이름 정리 요청으로 둔갑해버릴 수 있어 타입을 나눴다.
     @Published private var pendingDrops: [PendingDrop] = []
 
+    /// 지금 처리 중인 일이 Dock 드롭에서 시작됐는가.
+    ///
+    /// Dock 드롭은 "이것만 처리해줘"라는 일회성 부탁이라 결과를 확인하면 앱도 물러나는 게
+    /// 자연스럽다. 반면 창에서 직접 드롭한 경우는 사용자가 앱을 열어둔 것이므로 계속 떠 있어야
+    /// 한다. 같은 처리라도 어디서 시작했느냐에 따라 끝나는 방식이 다르다.
+    private var startedFromDock = false
+
     /// 결과 화면에서 "대기 중인 항목 N개"를 보여주기 위한 값.
     var pendingCount: Int { pendingDrops.count }
 
@@ -83,6 +90,13 @@ final class DropCoordinator: ObservableObject {
         returnToIdle()
     }
 
+    /// Dock 아이콘 드롭 전용 진입점. `handle` 과 하는 일은 같고, 끝난 뒤
+    /// 앱을 물러나게 할지만 다르다.
+    func handleFromDock(urls: [URL]) {
+        if case .idle = state { startedFromDock = true }
+        handle(urls: urls)
+    }
+
     func reset() {
         returnToIdle()
     }
@@ -105,7 +119,19 @@ final class DropCoordinator: ObservableObject {
     /// 통해 그대로 다시 부른다. `cancel()`/`reset()`에서만 부른다 — 즉 사용자가
     /// 확인 대화상자를 취소하거나 결과 화면의 "확인"을 눌러 **직접 그 화면을
     /// 치운** 시점에만 다음 대기 작업이 시작된다. 자동으로 넘어가지 않는다.
+    /// Dock 에서 시작해 대기열까지 모두 비었으면 앱을 닫는다.
+    /// 남은 일이 있으면 이어서 처리하므로 닫지 않는다.
+    private func quitIfDockWorkFinished() -> Bool {
+        guard startedFromDock, pendingDrops.isEmpty else { return false }
+        startedFromDock = false
+        NSApp.terminate(nil)
+        return true
+    }
+
     private func returnToIdle() {
+        // Dock 에서 시작한 일이 다 끝났으면 앱도 물러난다. 남은 대기열이 있으면
+        // 아래로 내려가 이어서 처리한다.
+        if quitIfDockWorkFinished() { return }
         state = .idle
         guard !pendingDrops.isEmpty else { return }
         let next = pendingDrops.removeFirst()

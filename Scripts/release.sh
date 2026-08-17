@@ -20,6 +20,15 @@ TEAM_ID="N9LYHMUDKA"
 SIGN_ID="Developer ID Application: Myeongseok SEO (${TEAM_ID})"
 NOTARY_PROFILE="MOA_NOTARY"
 
+# CI 는 서명 키를 기본 로그인 키체인이 아니라 임시 키체인에 둔다.
+# MOA_KEYCHAIN 이 설정돼 있으면 notarytool 에 그 키체인을 알려준다.
+# 로컬에서는 비어 있으므로 평소대로 로그인 키체인을 쓴다.
+KEYCHAIN_ARGS=()
+if [ -n "${MOA_KEYCHAIN:-}" ]; then
+    KEYCHAIN_ARGS=(--keychain "$MOA_KEYCHAIN")
+    echo "── 임시 키체인 사용: $MOA_KEYCHAIN"
+fi
+
 BUILD=".build/release-app"
 rm -rf "$BUILD"
 mkdir -p "$BUILD"
@@ -52,7 +61,7 @@ codesign --verify --deep --strict --verbose=2 "$APP"
 notarize_and_wait () {
     local target="$1"
     local out
-    out=$(xcrun notarytool submit "$target" --keychain-profile "$NOTARY_PROFILE" --wait 2>&1)
+    out=$(xcrun notarytool submit "$target" --keychain-profile "$NOTARY_PROFILE" "${KEYCHAIN_ARGS[@]}" --wait 2>&1)
     echo "$out"
 
     local sub_id
@@ -63,7 +72,7 @@ notarize_and_wait () {
     if [[ "$status" != "Accepted" ]]; then
         echo "!! 공증 실패: $target (status=${status:-unknown}, id=${sub_id:-unknown})"
         if [[ -n "${sub_id:-}" ]]; then
-            xcrun notarytool log "$sub_id" --keychain-profile "$NOTARY_PROFILE" "$BUILD/notary-${sub_id}.log" || true
+            xcrun notarytool log "$sub_id" --keychain-profile "$NOTARY_PROFILE" "${KEYCHAIN_ARGS[@]}" "$BUILD/notary-${sub_id}.log" || true
             echo "── 공증 로그 (notary-${sub_id}.log)"
             cat "$BUILD/notary-${sub_id}.log" || true
         fi

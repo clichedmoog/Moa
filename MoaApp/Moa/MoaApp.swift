@@ -8,7 +8,11 @@ struct MoaApp: App {
     @StateObject private var coordinator = DropCoordinator()
 
     var body: some Scene {
-        WindowGroup {
+        // `WindowGroup` 이 아니라 `Window` 다. 앞의 것은 문서 기반 앱용이라
+        // Dock 드롭이나 재실행마다 창을 새로 연다 — 파일 하나를 처리하고 끝나는
+        // 유틸리티에는 맞지 않고, 창이 여러 개면 `AppDelegate` 가 붙들 coordinator 가
+        // 어느 창의 것인지도 흐려져 대기열이 엉킨다. 창은 언제나 하나다.
+        Window("Moa", id: "main") {
             RootView()
                 .environmentObject(coordinator)
                 .task {
