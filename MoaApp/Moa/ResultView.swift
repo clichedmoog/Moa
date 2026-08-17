@@ -62,8 +62,11 @@ struct ResultView: View {
     // 자모 마크 대신 완료 표시를 둔다. 그 마크가 하는 말은 "흩어진 것이 모인다"이고
     // 그건 일이 벌어지는 동안 할 말이다. 여기서 필요한 건 끝났다는 신호뿐이고,
     // 무슨 일이 있었는지는 아래 글이 말한다.
+    /// `failed` 가 아니라 `hasUnfixed` 를 본다. 이름 충돌로 건너뛴 항목은
+    /// `failed` 에 없지만 고쳐야 할 파일이 그대로 남은 것이라, 체크 표시를 띄우면
+    /// F1 과 같은 거짓 성공이 된다.
     private var outcome: DoneMark.Outcome {
-        if !report.failed.isEmpty { return .hadFailures }
+        if report.hasUnfixed { return .hadFailures }
         return report.hasChanges ? .changed : .nothingToDo
     }
 

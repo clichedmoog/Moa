@@ -73,7 +73,10 @@ public enum NormalizationService {
             case .alreadyNormalized:
                 alreadyNormalized += 1
             case .skippedCollision:
-                skipped.append(ReportEntry(path: display, detail: "같은 이름의 다른 파일이 있어 건너뜀"))
+                // 충돌은 "건너뜀"에 들어가지만 성격이 다르다 — 고쳐야 할 파일이 그대로 남았다.
+                skipped.append(ReportEntry(path: display,
+                                           detail: "같은 이름의 다른 파일이 있어 건너뜀",
+                                           leftUnfixed: true))
             case .verificationFailed:
                 failed.append(ReportEntry(path: display, detail: "이 볼륨이 이름을 되돌림"))
             case .failed(let code):

@@ -232,4 +232,29 @@ final class NormalizationServiceTests: XCTestCase {
         XCTAssertTrue(report.failed.contains { $0.detail.contains("접근하지 못함") },
                       "없는 경로가 조용히 사라지면 안 된다")
     }
+
+    /// 이름 충돌은 `skipped` 에 들어가지만 "고쳐야 했는데 못 고친 것"이다.
+    /// 이걸 의도적 제외(심볼릭 링크·번들·숨김)와 같이 취급하면 결과 화면이
+    /// "이미 모두 모아져 있습니다"라고 말하는데, 파일은 그대로 남아 있다.
+    func testCollisionCountsAsUnfixed() {
+        let collision = ReportEntry(path: "/tmp/한.txt",
+                                    detail: "같은 이름의 다른 파일이 있어 건너뜀",
+                                    leftUnfixed: true)
+        let report = MoaReport(renamed: [], alreadyNormalized: 3,
+                               skipped: [collision], failed: [], volumeWarning: nil)
+
+        XCTAssertFalse(report.hasChanges)
+        XCTAssertTrue(report.hasUnfixed, "충돌은 고치지 못한 것으로 세어야 한다")
+    }
+
+    /// 반대로 의도적 제외만 있으면 "이미 다 정상"이 참이다.
+    func testDeliberateSkipsAreNotUnfixed() {
+        let bundle = ReportEntry(path: "/tmp/문서.rtfd", detail: "번들 — 내부는 건드리지 않음")
+        let hidden = ReportEntry(path: "/tmp/.git", detail: "숨김 항목")
+        let report = MoaReport(renamed: [], alreadyNormalized: 5,
+                               skipped: [bundle, hidden], failed: [], volumeWarning: nil)
+
+        XCTAssertFalse(report.hasUnfixed, "의도적 제외는 실패가 아니다")
+    }
+
 }
