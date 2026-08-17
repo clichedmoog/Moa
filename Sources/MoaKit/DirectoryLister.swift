@@ -29,8 +29,17 @@ public enum DirectoryListerError: Error, Equatable {
 public enum DirectoryLister {
 
     public static func entries(in dir: PathBytes) throws -> [DirectoryEntry] {
-        guard let handle = dir.withCString({ opendir($0) }) else {
-            throw DirectoryListerError.cannotOpen(errno: errno)
+        // errno 는 withCString 클로저 안, opendir 호출 직후에 캡처한다. 클로저가
+        // 반환한 뒤 전역 errno 를 읽으면 임시 C 문자열 버퍼 해제가 그 사이 errno 를
+        // 덮어썼을 가능성을 배제할 수 없다 — Renamer.lstatus 와 같은 원칙이다.
+        var openErrno: Int32 = 0
+        let maybeHandle = dir.withCString { pointer -> UnsafeMutablePointer<DIR>? in
+            let result = opendir(pointer)
+            openErrno = errno
+            return result
+        }
+        guard let handle = maybeHandle else {
+            throw DirectoryListerError.cannotOpen(errno: openErrno)
         }
         defer { closedir(handle) }
 

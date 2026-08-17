@@ -55,6 +55,23 @@ final class DirectoryListerTests: XCTestCase {
         XCTAssertThrowsError(try DirectoryLister.entries(in: missing))
     }
 
+    /// F3 회귀: opendir 실패 시 errno 는 withCString 클로저 안, 호출 직후에
+    /// 캡처해야 한다. 클로저가 반환한 뒤 전역 errno 를 읽으면 그 사이 다른 호출이
+    /// (예: 임시 C 문자열 버퍼 해제) errno 를 덮어썼을 가능성이 있다. 이 테스트는
+    /// 캡처 위치가 바뀌어도 자연스럽게 항상 통과할 수 있는 값(그저 "던진다")이 아니라,
+    /// 캡처된 errno 가 실제 실패 원인(ENOENT)과 정확히 일치하는지를 확인한다.
+    func testCannotOpenReportsAccurateErrno() {
+        let missing = dir.appending(Array("없는폴더".utf8))
+        do {
+            _ = try DirectoryLister.entries(in: missing)
+            XCTFail("존재하지 않는 디렉터리는 던져야 한다")
+        } catch DirectoryListerError.cannotOpen(let code) {
+            XCTAssertEqual(code, ENOENT)
+        } catch {
+            XCTFail("cannotOpen 이 아닌 다른 오류: \(error)")
+        }
+    }
+
     func testNameVerifierReturnsOnDiskBytes() {
         let path = TestSupport.makeFile(named: TestSupport.nfd("한.txt"), in: dir)
         XCTAssertEqual(NameVerifier.onDiskName(of: path), TestSupport.nfd("한.txt"))
@@ -94,6 +111,47 @@ final class DirectoryListerTests: XCTestCase {
         let longestName = Self.longestAcceptedName(in: dir)
         let path = TestSupport.makeFile(named: longestName, in: dir)
         XCTAssertEqual(NameVerifier.onDiskName(of: path), longestName)
+    }
+
+    // MARK: - F2 회귀: attr_dataoffset 부호 가드
+
+    /// attr_dataoffset 은 attrreference_t 안에서 int32_t(부호 있음)다. 커널이 정상
+    /// 경로로 음수를 주는 일은 없지만, 손으로 만든 버퍼로 그 상황을 흉내 내
+    /// `parseAttrBuffer` 가 실제 syscall 없이도 방어하는지 확인한다. 가드가 없으면
+    /// `requiredSize` 검사(4 + dataOffset + length <= buffer.count)를 음수 덕분에
+    /// 통과해버리고, 그 뒤 포인터가 버퍼 시작보다 앞을 가리켜 버퍼 밖을 읽는다.
+    func testParseAttrBufferRejectsNegativeDataOffset() {
+        let buffer = Self.makeAttrBuffer(dataOffset: -1, length: 5, totalCapacity: 32)
+        XCTAssertEqual(NameVerifier.parseAttrBuffer(buffer), .failure)
+    }
+
+    /// 같은 헬퍼로 만든, 부호가 정상(0 이상)인 버퍼는 계속 성공해야 한다 —
+    /// 가드가 정상 경로까지 막지 않는지 확인한다.
+    func testParseAttrBufferAcceptsNonNegativeDataOffset() {
+        let payload = Array("한.txt".utf8) + [0] // attr_length 는 NUL 종료를 포함한다
+        let buffer = Self.makeAttrBuffer(dataOffset: 8, length: UInt32(payload.count),
+                                          payload: payload, totalCapacity: 32)
+        XCTAssertEqual(NameVerifier.parseAttrBuffer(buffer), .success(Array("한.txt".utf8)))
+    }
+
+    /// getattrlist 가 채우는 버퍼 형식을 손으로 조립한다: 4바이트 전체 길이 +
+    /// attrreference_t(attr_dataoffset, attr_length) + 그 뒤 payload.
+    private static func makeAttrBuffer(dataOffset: Int32, length: UInt32,
+                                        payload: [UInt8] = [], totalCapacity: Int) -> [UInt8] {
+        var buffer = [UInt8](repeating: 0, count: totalCapacity)
+        var reference = attrreference_t(attr_dataoffset: dataOffset, attr_length: length)
+        withUnsafeBytes(of: &reference) { raw in
+            for (i, byte) in raw.enumerated() {
+                buffer[4 + i] = byte
+            }
+        }
+        let start = 4 + Int(dataOffset)
+        if dataOffset >= 0, start + payload.count <= buffer.count {
+            for (i, byte) in payload.enumerated() {
+                buffer[start + i] = byte
+            }
+        }
+        return buffer
     }
 
     // MARK: - F3 회귀: classifyViaLstat 시임 (DT_UNKNOWN 폴백)

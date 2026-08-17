@@ -31,7 +31,7 @@ public enum NameVerifier {
         }
     }
 
-    private enum Attempt {
+    enum Attempt: Equatable {
         case success([UInt8])
         case tooSmall(requiredSize: Int)
         case failure
@@ -50,23 +50,35 @@ public enum NameVerifier {
             }
         }
         guard status == 0 else { return .failure }
+        return parseAttrBuffer(buffer)
+    }
 
-        return buffer.withUnsafeBytes { raw -> Attempt in
+    /// getattrlist 가 채운 버퍼를 해석한다. 실제 syscall 과 분리된 내부 시임이라,
+    /// 커널이 정상 경로로는 절대 주지 않는 값(예: 음수 attr_dataoffset)도 손으로
+    /// 만든 버퍼로 테스트할 수 있다.
+    static func parseAttrBuffer(_ buffer: [UInt8]) -> Attempt {
+        buffer.withUnsafeBytes { raw -> Attempt in
             guard let base = raw.baseAddress else { return .failure }
             // 버퍼 선두 4바이트는 전체 길이. 그 뒤가 attrreference_t 다.
             let reference = base.advanced(by: 4)
                 .assumingMemoryBound(to: attrreference_t.self).pointee
             let length = Int(reference.attr_length)
             guard length > 1 else { return .failure }
+            // attr_dataoffset 은 attrreference_t 안에서 int32_t, 즉 부호가 있다. 음수면
+            // 아래 requiredSize 검사를 통과하면서도(더한 값이 작아지므로) 포인터를
+            // 버퍼 시작보다 앞으로 옮겨 버퍼 밖 메모리를 읽게 된다. 커널이 음수를 주는
+            // 정상 경로는 없지만, 이 검증이 앱의 유일한 안전망이라 방어적으로 막는다.
+            guard reference.attr_dataoffset >= 0 else { return .failure }
+            let dataOffset = Int(reference.attr_dataoffset)
             // 버퍼가 너무 작아도 getattrlist 는 ERANGE 를 돌려주지 않고 status == 0 과 함께
             // attr_length·attr_dataoffset 에 "실제" 값을 채워 넣는다 — 잘린 값이 아니다.
             // 그래서 슬라이싱하기 전에 이 값들이 버퍼 안에 실제로 들어오는지 반드시 확인해야 한다.
             // 확인 없이 바로 슬라이싱하면 버퍼 밖의 힙 메모리를 읽는다.
-            let requiredSize = 4 + Int(reference.attr_dataoffset) + length
+            let requiredSize = 4 + dataOffset + length
             guard requiredSize <= buffer.count else {
                 return .tooSmall(requiredSize: requiredSize)
             }
-            let start = base.advanced(by: 4 + Int(reference.attr_dataoffset))
+            let start = base.advanced(by: 4 + dataOffset)
                 .assumingMemoryBound(to: UInt8.self)
             // attr_length 는 NUL 을 포함하므로 1을 뺀다.
             return .success(Array(UnsafeBufferPointer(start: start, count: length - 1)))
