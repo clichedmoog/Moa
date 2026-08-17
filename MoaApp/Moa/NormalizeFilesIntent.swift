@@ -30,16 +30,29 @@ struct NormalizeFilesIntent: AppIntent {
     var files: [IntentFile]
 
     func perform() async throws -> some IntentResult & ReturnsValue<Int> {
-        let roots: [PathBytes] = files.compactMap { file in
-            // 원본 파일에 대한 참조가 있어야 제자리에서 이름을 고칠 수 있다.
-            // 단축어가 데이터 복사본만 넘기면 fileURL 이 nil 이고, 그때는 고칠 대상이 없다 —
-            // 임시 복사본의 이름을 바꿔봐야 사용자 파일은 그대로다.
-            guard let url = file.fileURL else { return nil }
-            return PathBytes(Self.fileSystemBytes(of: url))
+        // 원본 파일에 대한 참조가 있어야 제자리에서 이름을 고칠 수 있다.
+        // 단축어가 데이터 복사본만 넘기면 `fileURL` 이 nil 이고, 그때는 고칠 대상이 없다 —
+        // 임시 복사본의 이름을 바꿔봐야 사용자 파일은 그대로다.
+        //
+        // **닿지 못한 게 하나라도 있으면 전부 멈춘다.** 닿은 것만 골라 처리하면
+        // 반환값은 "3개 고침"인데 사용자는 5개를 넘겼으므로, 나머지 2개는 고칠 게
+        // 없었다고 읽는다. 단축어는 사람이 지켜보지 않는 자동화라 그 오해가 조용히
+        // 쌓인다. 이 저장소가 실패 목록을 절대 삼키지 않는 것과 같은 이유다.
+        var roots: [PathBytes] = []
+        roots.reserveCapacity(files.count)
+        for file in files {
+            guard let url = file.fileURL else {
+                throw NormalizeFilesError.notAnOriginalFile(name: file.filename)
+            }
+            let bytes = Self.fileSystemBytes(of: url)
+            guard !bytes.isEmpty else {
+                throw NormalizeFilesError.notAnOriginalFile(name: file.filename)
+            }
+            roots.append(PathBytes(bytes))
         }
 
         guard !roots.isEmpty else {
-            throw NormalizeFilesError.noOriginalFiles
+            throw NormalizeFilesError.noFiles
         }
 
         // 메인 스레드 밖에서 돈다. 훑기와 rename 은 항목 수에 비례해 오래 걸리는데,
@@ -65,14 +78,19 @@ struct NormalizeFilesIntent: AppIntent {
 }
 
 enum NormalizeFilesError: Error, CustomLocalizedStringResourceConvertible {
-    case noOriginalFiles
+    /// 넘어온 항목이 원본 파일이 아니라 사본이었다.
+    case notAnOriginalFile(name: String)
+    /// 넘어온 항목이 아예 없다.
+    case noFiles
 
     var localizedStringResource: LocalizedStringResource {
         switch self {
-        case .noOriginalFiles:
-            // 사용자가 고칠 수 있는 문제다. 파일 자체가 아니라 사본이 넘어온 상황이므로,
-            // 무엇을 바꿔야 하는지 알려준다.
-            "원본 파일을 받지 못했습니다. 앞 단계에서 파일 자체를 넘겨주세요."
+        case .notAnOriginalFile(let name):
+            // 사용자가 고칠 수 있는 문제다. 어느 항목이 문제였는지 짚어주지 않으면
+            // 여러 파일을 넘긴 단축어에서 무엇을 바꿔야 할지 알 수 없다.
+            "‘\(name)’의 원본을 받지 못했습니다. 앞 단계에서 파일 사본이 아니라 파일 자체를 넘겨주세요."
+        case .noFiles:
+            "고칠 파일이 없습니다."
         }
     }
 }
