@@ -41,6 +41,19 @@ targets:
         # 수출 규정 질문에 매번 답해야 한다. 모아는 네트워크도 암호화도 쓰지 않는다.
         ITSAppUsesNonExemptEncryption: false
         NSPrincipalClass: NSApplication
+        # Finder 우클릭 → 서비스. NSMessage 는 ServicesProvider 의 @objc 메서드 이름과
+        # 정확히 같아야 하고, 다르면 메뉴에는 나타나되 눌러도 아무 일이 없다.
+        # NSRequiredContext 를 비워 두면 텍스트를 선택했을 때도 메뉴에 뜬다 — 파일에만
+        # 의미가 있으므로 FilePath 로 좁힌다.
+        NSServices:
+          - NSMenuItem:
+              default: "모아쓰기"
+            NSMessage: normalizeNames
+            NSPortName: Moa
+            NSSendTypes:
+              - public.file-url
+            NSRequiredContext:
+              NSTextContent: FilePath
         CFBundleDocumentTypes:
           - CFBundleTypeName: All Documents
             CFBundleTypeRole: Editor

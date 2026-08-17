@@ -13,6 +13,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var coordinator: DropCoordinator?
     private var pending: [URL] = []
 
+    /// Finder 우클릭 → 서비스 요청을 받는다. AppKit 이 약한 참조로 들고 있으므로
+    /// 여기서 강하게 붙들지 않으면 등록 직후 사라진다.
+    let services = ServicesProvider()
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        services.appDelegate = self
+        NSApp.servicesProvider = services
+        // 개발 중 Info.plist 의 서비스 선언이 바뀌었을 때 시스템이 알아채게 한다.
+        // 배포판에서는 설치만으로 등록되므로 사실상 무해한 호출이다.
+        NSUpdateDynamicServices()
+    }
+
     func application(_ application: NSApplication, open urls: [URL]) {
         guard let coordinator else {
             pending.append(contentsOf: urls)
