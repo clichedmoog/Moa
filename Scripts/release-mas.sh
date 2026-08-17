@@ -12,10 +12,12 @@
 #        3rd Party Mac Developer Installer: ...
 #   2. 프로비저닝 프로파일 "Moa Mac App Store" 가 설치돼 있어야 한다
 #        ~/Library/Developer/Xcode/UserData/Provisioning Profiles/<UUID>.provisionprofile
-#   3. 업로드용 앱 암호를 키체인에 넣어둔다 — 인자로 넘기지 않는 이유는
-#      명령행 인자가 `ps` 로 다른 프로세스에 보이기 때문이다.
-#        security add-generic-password -a "$APPLE_ID" -s MOA_ASC_PASSWORD -w
-#      (붙여넣기 프롬프트가 뜬다. 값은 appleid.apple.com 에서 만든 앱 암호)
+#   3. App Store Connect API 키가 있어야 한다. 앱 암호 대신 이걸 쓰는 이유는
+#      비밀값이 명령행에 오르지 않고(`ps` 로 다른 프로세스에 보인다), 권한도
+#      "앱 관리"로 좁힐 수 있기 때문이다.
+#        ~/.appstoreconnect/private_keys/AuthKey_<KEY_ID>.p8
+#      키는 App Store Connect > 사용자 및 액세스 > 통합 에서 만든다.
+#      .p8 은 한 번만 내려받을 수 있으므로 ~/.moa-signing 에도 사본을 둔다.
 #
 # 사용:
 #   Scripts/release-mas.sh              # 빌드 + 검증까지만 (업로드 안 함)
@@ -27,7 +29,8 @@ TEAM_ID="N9LYHMUDKA"
 APPLE_ID="tenma@mac.com"
 BUNDLE_ID="com.clichedmoog.Moa"
 PROFILE_NAME="Moa Mac App Store"
-KEYCHAIN_ITEM="MOA_ASC_PASSWORD"
+ASC_KEY_ID="DF5M8R379V"
+ASC_ISSUER_ID="69a6de79-892a-47e3-e053-5b8c7c11a4d1"
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BUILD="$ROOT/.build/release-mas"
@@ -109,10 +112,12 @@ PKG="$BUILD/export/Moa.pkg"
 [ -f "$PKG" ] || { echo "내보내기 실패" >&2; exit 1; }
 echo "   ✓ $PKG ($(( $(stat -f%z "$PKG") / 1024 )) KB)"
 
-if ! security find-generic-password -s "$KEYCHAIN_ITEM" >/dev/null 2>&1; then
+KEY_FILE=~/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8
+if [ ! -f "$KEY_FILE" ]; then
     echo
-    echo "앱 암호가 키체인에 없어 검증·업로드를 건너뛴다. 넣으려면:"
-    echo "  security add-generic-password -a \"$APPLE_ID\" -s $KEYCHAIN_ITEM -w"
+    echo "API 키가 없어 검증·업로드를 건너뛴다. 있어야 할 곳:"
+    echo "  $KEY_FILE"
+    echo "사본이 ~/.moa-signing 에 있다면 그걸 복사하면 된다."
     echo
     echo "빌드는 끝났다: $PKG"
     exit 0
@@ -120,12 +125,12 @@ fi
 
 echo "── App Store Connect 검증"
 xcrun altool --validate-app -f "$PKG" -t macos \
-    -u "$APPLE_ID" -p "@keychain:$KEYCHAIN_ITEM" 2>&1 | sed 's/^/   /'
+    --apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID" 2>&1 | sed 's/^/   /'
 
 if [ "$UPLOAD" -eq 1 ]; then
     echo "── 업로드"
     xcrun altool --upload-app -f "$PKG" -t macos \
-        -u "$APPLE_ID" -p "@keychain:$KEYCHAIN_ITEM" 2>&1 | sed 's/^/   /'
+        --apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID" 2>&1 | sed 's/^/   /'
     echo
     echo "업로드 완료. App Store Connect 에서 처리가 끝나면(보통 10~30분)"
     echo "빌드를 버전에 붙이고 심사에 제출한다."
