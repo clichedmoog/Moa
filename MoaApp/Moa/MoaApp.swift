@@ -17,7 +17,10 @@ struct MoaApp: App {
                 .environmentObject(coordinator)
                 .task {
                     appDelegate.coordinator = coordinator
+                    appDelegate.services.coordinator = coordinator
                     appDelegate.flushPending()
+                    // 서비스로 앱이 깨어난 경우, 요청이 창보다 먼저 도착해 있다.
+                    appDelegate.services.flushPending()
                 }
         }
         .windowResizability(.contentSize)
