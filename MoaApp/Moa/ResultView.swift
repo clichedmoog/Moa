@@ -67,13 +67,29 @@ struct ResultView: View {
         return report.hasChanges ? .changed : .nothingToDo
     }
 
+    // `outcome` 과 같은 3단 우선순위를 따른다 — 실패가 있으면 "이미 모두
+    // 모아져 있습니다"라고 말하면 안 된다. 그건 아무 문제도 없었다는 뜻인데,
+    // 바로 아래 빨간 배너가 실패를 알리는 중이라면 거짓이다.
+    // 일부라도 모았다면 그 개수는 여전히 사실이므로 그대로 둔다 — 실패는
+    // 빨간 배너가 전달한다.
+    private var headline: String {
+        switch outcome {
+        case .hadFailures:
+            return report.hasChanges ? "\(report.renamed.count)개를 모았습니다"
+                                     : "모으지 못했습니다"
+        case .changed:
+            return "\(report.renamed.count)개를 모았습니다"
+        case .nothingToDo:
+            return "이미 모두 모아져 있습니다"
+        }
+    }
+
     private var header: some View {
         HStack(alignment: .center, spacing: 14) {
             DoneMark(outcome: outcome)
 
             VStack(alignment: .leading, spacing: 4) {
-                Text(report.hasChanges ? "\(report.renamed.count)개를 모았습니다"
-                                       : "이미 모두 모아져 있습니다")
+                Text(headline)
                     .font(.title2.bold())
 
                 if report.alreadyNormalized > 0 {
