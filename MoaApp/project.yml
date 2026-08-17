@@ -5,6 +5,14 @@ options:
     macOS: "13.0"
   createIntermediateGroups: true
 
+# Release 와 ReleaseMAS 는 같은 코드를 다른 서명 체계로 낸다.
+#   Release    — Developer ID + 공증, GitHub Release 로 직접 배포
+#   ReleaseMAS — Apple Distribution + 프로비저닝 프로파일, Mac App Store
+configs:
+  Debug: debug
+  Release: release
+  ReleaseMAS: release
+
 packages:
   MoaKit:
     path: ..
@@ -55,3 +63,15 @@ targets:
           DEVELOPMENT_TEAM: N9LYHMUDKA
           ENABLE_HARDENED_RUNTIME: YES
           OTHER_CODE_SIGN_FLAGS: "--timestamp"
+        ReleaseMAS:
+          CODE_SIGN_STYLE: Manual
+          CODE_SIGN_IDENTITY: "Apple Distribution"
+          DEVELOPMENT_TEAM: N9LYHMUDKA
+          PROVISIONING_PROFILE_SPECIFIER: "Moa Mac App Store"
+          # 하드닝 런타임은 공증 요건이지 앱스토어 요건이 아니다. 켜 둬도
+          # 해가 없지만, 앱스토어 심사는 프로파일과 샌드박스로 판단한다.
+          ENABLE_HARDENED_RUNTIME: NO
+          # 후원 메뉴를 이 빌드에서만 뺀다 — App Store Review Guideline 3.1.1
+          # 은 IAP 외 결제 수단으로 유도하는 링크를 금지한다. 순수 후원은
+          # 통과 사례도 반려 사례도 있어 예측이 안 되므로 아예 넣지 않는다.
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) MAS"
