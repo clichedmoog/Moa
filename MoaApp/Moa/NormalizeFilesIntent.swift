@@ -29,7 +29,6 @@ struct NormalizeFilesIntent: AppIntent {
     @Parameter(title: "파일")
     var files: [IntentFile]
 
-    @MainActor
     func perform() async throws -> some IntentResult & ReturnsValue<Int> {
         let roots: [PathBytes] = files.compactMap { file in
             // 원본 파일에 대한 참조가 있어야 제자리에서 이름을 고칠 수 있다.
@@ -43,8 +42,14 @@ struct NormalizeFilesIntent: AppIntent {
             throw NormalizeFilesError.noOriginalFiles
         }
 
-        let preview = NormalizationService.preview(roots: roots)
-        let report = NormalizationService.run(preview: preview)
+        // 메인 스레드 밖에서 돈다. 훑기와 rename 은 항목 수에 비례해 오래 걸리는데,
+        // 여기서 그대로 돌리면 앱 창이 떠 있는 동안 그만큼 멈춘다.
+        // `DropCoordinator` 가 같은 이유로 같은 선택을 했다.
+        let report = await Task.detached(priority: .userInitiated) {
+            let preview = NormalizationService.preview(roots: roots)
+            return NormalizationService.run(preview: preview)
+        }.value
+
         return .result(value: report.renamed.count)
     }
 
