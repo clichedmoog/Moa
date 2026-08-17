@@ -124,7 +124,7 @@ Review **someone else's PR** (`/pr review 12`). Read-and-comment path — never 
    - `gh api repos/{owner}/{repo}/issues/<n>/comments --paginate` (issue-level — includes `coderabbitai[bot]` when the repo is public; whatever CodeRabbit already flagged, do not repeat in your own comment)
 
    `--paginate` is not optional — the default page is 30 items and a well-reviewed PR exceeds that in inline comments alone.
-2. **Read the diff (`gh pr diff <n>`) and trace each concern to a real code path.** Follow the path to its end before writing anything down — a theoretical risk that cannot actually occur must not be posted. If the diff touches rename/traversal logic, load the domain pitfalls from `HANDOFF.md` §5 (see [Domain context injection](#domain-context-injection)).
+2. **Read the diff (`gh pr diff <n>`) and trace each concern to a real code path.** Follow the path to its end before writing anything down — a theoretical risk that cannot actually occur must not be posted. If the diff touches rename/traversal logic, load the domain pitfalls from the design spec §3 (see [Domain context injection](#domain-context-injection)).
 3. **테스트 계획**: this workflow does not run the app for someone else's PR (no automated verification). Verify what you can by code reading and record a per-item verdict; report which items still need the author's manual run. Do NOT touch their PR body yet — ticking happens in step 5, after sign-off.
 4. **Draft the comment and show it to the user first.** Never post or approve before that review. Tone: author is Claude — say so; dry and short, ~요체; no praise, no 총평; nothing left to say → `LGTM 👍` alone; drop low-importance nits entirely.
 5. **Post, approve, then tick** — after the user signs off. Post with `gh pr comment <n> --body "<draft>"` (top-level comment, not a thread reply); approve with `gh pr review <n> --approve`. Approve only if nothing you posted is an outstanding Critical finding. Never `REQUEST_CHANGES` unless the user asks. Then tick the boxes you verified: fetch the body **immediately before** the edit (`gh pr view <n> --json body --jq .body` — a stale copy silently clobbers the author's concurrent edits), flip only `- [ ]` → `- [x]` on that fresh copy with every other byte untouched, and write it with `bash scripts/gh-pr-edit.sh <n> "<body>"`.
@@ -141,15 +141,17 @@ Pass each agent an explicit scope — the default unstaged-only diff misses comm
 
 ### Domain context injection
 
-Before reviewing, each agent must read **`HANDOFF.md` §5 (기술 배경)** whenever the diff touches filename conversion, filesystem traversal, or rename logic. It records the project's real failure modes:
+Before reviewing, each agent must read **`docs/superpowers/specs/2026-08-16-moa-design.md` §3 (파일시스템과 정규화)** whenever the diff touches filename conversion, filesystem traversal, or rename logic. It records the project's real failure modes, each one measured rather than assumed:
 
+- **Foundation returns NFD paths.** `NSString.fileSystemRepresentation` re-decomposes before the syscall, so `FileManager.moveItem` silently no-ops on an NFD→NFC rename — it reports success and changes nothing. Same trap in `Data.write(to:)`, `FileManager.createFile`, and `OutputStream`. Only POSIX `rename(2)` on raw bytes works.
+- **Swift `String ==` ignores normalization**, so `name == name.precomposedStringWithCanonicalMapping` is always `true`. Comparison must be byte-level.
 - Bottom-up (deepest-first) traversal — renaming a parent first invalidates collected child paths
-- APFS is normalization-insensitive on comparison: an NFD→NFC rename may need a 2-step rename via a temp name
-- HFS+ forces NFD back — conversion is meaningless there; detect and inform
+- APFS, HFS+, and exFAT are all normalization-**insensitive** on comparison, so collision detection compares `(st_dev, st_ino)`, never names. A 2-step rename via a temp name is *not* needed on APFS (measured; §3.2).
+- HFS+ **and exFAT** both force NFD back — conversion does not survive there; detect and inform
 - Skip already-NFC items; don't follow symlinks; don't descend into bundle packages (`.app`, `.rtfd`)
 - Name-collision policy must be explicit, never silent
 
-`HANDOFF.md` §5 is the authoritative source — the bullets above are a summary and may lag it (the APFS 2-step-rename question is still marked 실측 필요 there). A reviewer that has not read the file will miss the bugs that actually matter in this codebase.
+The design spec is the authoritative source — the bullets above are a summary and may lag it. A reviewer that has not read it will miss the bugs that actually matter in this codebase.
 
 ### Agent availability preflight (BEFORE launching the fleet)
 
@@ -179,7 +181,7 @@ claude plugin install pr-review-toolkit@claude-plugins-official --scope user
 
 **Conditionally run (only when the diff matches):**
 - **type-design-analyzer** — when the diff adds or changes Swift types (structs, enums, protocols). Reviews encapsulation and invariant expression.
-- **pr-test-analyzer** — when the diff touches the conversion/traversal core logic (per HANDOFF, the core must have unit tests with NFD-filename fixtures generated in code) or modifies test files.
+- **pr-test-analyzer** — when the diff touches the conversion/traversal core logic (the core must have unit tests with NFD-filename fixtures generated in code, never checked in as literals) or modifies test files.
 - **comment-analyzer** — when the diff adds or modifies non-trivial comments or docstrings.
 
 **Write "only report — do not modify any file" into every agent prompt** — the simplifier agents edit files by default, mid-fleet and concurrently with the other reviewers. Wait for all agents. An agent that errors out or returns no usable report is a **degraded slot**: retry it once; if it fails again, run its focus yourself or report it exactly like a fallback slot — never count a failed agent as a clean pass. **Apply fixes in order**: code-review → silent-failure-hunter → type-design-analyzer → pr-test-analyzer → code-simplifier → comment-analyzer. Apply `Critical` and `Important` automatically; list `Nitpick`s for the user and apply only those that objectively improve the code. Then format and commit.
