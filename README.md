@@ -29,4 +29,8 @@ Developer ID로 서명하고 공증(notarization)까지 마쳤으므로 첫 실�
 
 ## 참고
 
-같은 문제를 다루는 선행 앱으로 김남호 님의 [Contact](https://namocom.tistory.com/901)([소스](https://github.com/namhokim/cocoa_app), MIT)가 있다. 코드 사이닝이 없고 Java 기반이라 Apple Silicon에서 로제타가 필요한 점을 개선하는 것이 이 프로젝트의 출발점이다. 드래그앤드롭 UX와 마우스를 올렸을 때 파일 선택 버튼이 나타나는 아이디어를 참고했고, 코드는 별도로 작성했다.
+같은 문제를 다루는 선행 앱으로 김남호 님의 [Contact](https://namocom.tistory.com/901)([소스](https://github.com/namhokim/cocoa_app), MIT)가 있다. 드래그앤드롭 UX와 마우스를 올렸을 때 파일 선택 버튼이 나타나는 아이디어를 참고했고, 코드는 별도로 작성했다.
+
+Contact도 Swift와 Cocoa로 만들어졌다. 다만 배포된 바이너리가 인텔 전용(`x86_64`)이라 Apple Silicon에서는 로제타가 필요하고, 코드 사이닝이 없어 첫 실행에 보안 경고를 뚫어야 한다. 모아는 이 두 가지를 Universal 빌드와 서명·공증으로 해결한 것이 출발점이다.
+
+변환 방식도 다르다. Contact는 `mv` 명령이 담긴 셸 스크립트를 만들어 실행하는데, 이는 Foundation이 파일 경로를 NFD로 되돌리는 문제를 우회하는 영리한 방법이었다. 모아는 App Sandbox 안에서 동작해야 해서 셸을 쓸 수 없었고, 그래서 POSIX `rename(2)`을 직접 호출한다. 더 나은 판단이었다기보다 제약이 달랐던 결과다.
