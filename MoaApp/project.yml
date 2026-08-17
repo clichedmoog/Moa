@@ -30,6 +30,12 @@ targets:
         LSApplicationCategoryType: public.app-category.utilities
         NSHumanReadableCopyright: "Copyright © 2026"
         NSPrincipalClass: NSApplication
+        CFBundleDocumentTypes:
+          - CFBundleTypeName: All Documents
+            CFBundleTypeRole: Editor
+            LSItemContentTypes:
+              - public.item
+            LSHandlerRank: None
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.clichedmoog.Moa

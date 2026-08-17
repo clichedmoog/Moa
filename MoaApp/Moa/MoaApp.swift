@@ -4,14 +4,22 @@ import SwiftUI
 
 @main
 struct MoaApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var coordinator = DropCoordinator()
 
     var body: some Scene {
         WindowGroup {
             RootView()
                 .environmentObject(coordinator)
+                .task {
+                    appDelegate.coordinator = coordinator
+                    appDelegate.flushPending()
+                }
         }
         .windowResizability(.contentSize)
+        .commands {
+            CommandGroup(replacing: .newItem) { }
+        }
     }
 }
 
