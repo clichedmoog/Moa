@@ -23,7 +23,19 @@ struct MoaApp: App {
         .windowResizability(.contentSize)
         .commands {
             CommandGroup(replacing: .newItem) { }
+            // 후원 링크. 창이 아니라 메뉴 막대에만 둔다 — 창은 파일이 깨져서 여는
+            // 곳이라 그 자리에 후원 버튼을 두면 어색하다. 구매·잠금 해제가 아니라
+            // 순수 후원이고, 앱 동작은 후원 여부와 무관하게 항상 같다.
+            CommandGroup(after: .appInfo) {
+                Button("커피 한 잔 사주기") {
+                    NSWorkspace.shared.open(sponsorURL)
+                }
+            }
         }
+    }
+
+    private var sponsorURL: URL {
+        URL(string: "https://github.com/sponsors/clichedmoog")!
     }
 }
 
