@@ -26,3 +26,8 @@ xcuserdata/
 # XcodeGen 생성물
 MoaApp/Moa.xcodeproj/
 MoaApp/Moa/Info.plist
+
+# 개발 과정 작업 공간 (원장·리뷰 패키지·태스크 브리프)
+# 하위에 스킬이 만든 .gitignore 가 있지만 그것에 기대지 않는다 —
+# 그 파일이 사라지거나 sdd/ 밖에 뭔가 생기면 그대로 커밋에 딸려 들어간다.
+.superpowers/
