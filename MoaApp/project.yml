@@ -36,7 +36,10 @@ targets:
         CFBundleVersion: "1"
         LSMinimumSystemVersion: "13.0"
         LSApplicationCategoryType: public.app-category.utilities
-        NSHumanReadableCopyright: "Copyright © 2026"
+        NSHumanReadableCopyright: "Copyright © 2026 Myeongseok Seo"
+        # 앱이 암호화를 쓰지 않음을 선언한다. 이게 없으면 App Store 에 올릴 때마다
+        # 수출 규정 질문에 매번 답해야 한다. 모아는 네트워크도 암호화도 쓰지 않는다.
+        ITSAppUsesNonExemptEncryption: false
         NSPrincipalClass: NSApplication
         CFBundleDocumentTypes:
           - CFBundleTypeName: All Documents
