@@ -3,6 +3,9 @@ import MoaKit
 
 struct ResultView: View {
     let report: MoaReport
+    /// 이 결과를 보는 동안 Dock 등으로 더 들어와 뒤에서 기다리고 있는 항목 수.
+    /// 0이면 평소처럼 "확인"만 보여준다.
+    let pendingCount: Int
     let onDone: () -> Void
 
     var body: some View {
@@ -41,8 +44,13 @@ struct ResultView: View {
             .frame(maxHeight: 220)
 
             HStack {
+                if pendingCount > 0 {
+                    Text("대기 중인 항목 \(pendingCount)개")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
                 Spacer()
-                Button("확인", action: onDone)
+                Button(pendingCount > 0 ? "확인하고 다음 처리" : "확인", action: onDone)
                     .buttonStyle(.borderedProminent)
                     .keyboardShortcut(.defaultAction)
             }

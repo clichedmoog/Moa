@@ -58,15 +58,15 @@ struct RootView: View {
                     .transition(.opacity)
 
             case .finished(let report):
-                ResultView(report: report) { coordinator.reset() }
+                ResultView(report: report, pendingCount: coordinator.pendingCount) { coordinator.reset() }
                     .transition(.opacity)
 
             case .zipped(let result, let url):
-                ZippedView(result: result, url: url) { coordinator.reset() }
+                ZippedView(result: result, url: url, pendingCount: coordinator.pendingCount) { coordinator.reset() }
                     .transition(.opacity)
 
             case .failed(let message):
-                FailedView(message: message) { coordinator.reset() }
+                FailedView(message: message, pendingCount: coordinator.pendingCount) { coordinator.reset() }
                     .transition(.opacity)
             }
         }
@@ -103,6 +103,8 @@ private struct WorkingView: View {
 private struct ZippedView: View {
     let result: ZipResult
     let url: URL
+    /// 이 결과를 보는 동안 Dock 등으로 더 들어와 뒤에서 기다리고 있는 항목 수.
+    let pendingCount: Int
     let onDone: () -> Void
 
     var body: some View {
@@ -161,7 +163,12 @@ private struct ZippedView: View {
             Button("Finder에서 보기") {
                 NSWorkspace.shared.activateFileViewerSelecting([url])
             }
-            Button("확인", action: onDone)
+            if pendingCount > 0 {
+                Text("대기 중인 항목 \(pendingCount)개")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Button(pendingCount > 0 ? "확인하고 다음 처리" : "확인", action: onDone)
                 .buttonStyle(.borderedProminent)
                 .keyboardShortcut(.defaultAction)
         }
@@ -172,6 +179,8 @@ private struct ZippedView: View {
 
 private struct FailedView: View {
     let message: String
+    /// 이 결과를 보는 동안 Dock 등으로 더 들어와 뒤에서 기다리고 있는 항목 수.
+    let pendingCount: Int
     let onDone: () -> Void
 
     var body: some View {
@@ -180,7 +189,12 @@ private struct FailedView: View {
                 .font(.system(size: 40))
                 .foregroundStyle(.red)
             Text(message)
-            Button("확인", action: onDone)
+            if pendingCount > 0 {
+                Text("대기 중인 항목 \(pendingCount)개")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Button(pendingCount > 0 ? "확인하고 다음 처리" : "확인", action: onDone)
                 .buttonStyle(.borderedProminent)
                 .keyboardShortcut(.defaultAction)
         }

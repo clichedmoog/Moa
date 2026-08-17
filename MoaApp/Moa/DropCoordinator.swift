@@ -24,8 +24,40 @@ final class DropCoordinator: ObservableObject {
 
     @Published private(set) var state: CoordinatorState = .idle
 
+    /// `state`가 `.idle`이 아닐 때 들어온 드롭을 미뤄 둔다.
+    ///
+    /// Dock 아이콘은 어떤 상태에서든 열려 있다 — `DropView`가 `.idle`에서만
+    /// 보이는 것과 달리 뷰 계층의 보호를 받지 못한다. 그래서 진입점(`handle`,
+    /// `makeZip`, `cleanArchive`) 각각이 자기 앞단에서 idle 여부를 확인하고,
+    /// 아니라면 여기 쌓아 둔다. 각 케이스는 그 진입점을 **나중에 그대로 다시
+    /// 부르는 데** 필요한 값만 담는다 — 큐에 넣는 시점에 "이게 압축 요청인지
+    /// 그냥 정리 요청인지" 미리 판단하지 않는다. 판단은 항상 idle로 돌아온 뒤
+    /// 그 진입점 자신이 다시 한다. 배열 하나로 뭉뚱그리면(단순 URL 목록) ZIP
+    /// 만들기 요청이 그냥 이름 정리 요청으로 둔갑해버릴 수 있어 타입을 나눴다.
+    @Published private var pendingDrops: [PendingDrop] = []
+
+    /// 결과 화면에서 "대기 중인 항목 N개"를 보여주기 위한 값.
+    var pendingCount: Int { pendingDrops.count }
+
+    private enum PendingDrop {
+        case dropped([URL])
+        case zip(from: [URL], to: URL)
+        case archive(URL)
+    }
+
     func handle(urls: [URL]) {
         guard !urls.isEmpty else { return }
+
+        // 이미 뭔가 진행 중이거나(working), 확인을 기다리거나(confirming),
+        // 아직 사용자가 보지 않은 결과 화면이 떠 있다면(finished/zipped/failed)
+        // 지금 바로 처리하지 않는다. 여기서 바로 처리해버리면 working 중엔
+        // Task 가 두 개 겹쳐 나중 것이 먼저 것을 덮어쓰고, 결과 화면 위에서는
+        // 아직 읽지 않은 리포트가 조용히 사라진다 — 실패 목록이 사라지는 쪽이
+        // 더 나쁘다.
+        guard case .idle = state else {
+            pendingDrops.append(.dropped(urls))
+            return
+        }
 
         // .zip 을 드롭하면 정리 모드로 간다.
         if urls.count == 1, urls[0].pathExtension.lowercased() == "zip" {
@@ -48,20 +80,42 @@ final class DropCoordinator: ObservableObject {
     }
 
     func cancel() {
-        state = .idle
+        returnToIdle()
     }
 
     func reset() {
-        state = .idle
+        returnToIdle()
     }
 
     /// 드롭된 항목을 NFC 이름의 ZIP 으로 묶는다.
     func makeZip(from urls: [URL], to destination: URL) {
+        guard case .idle = state else {
+            pendingDrops.append(.zip(from: urls, to: destination))
+            return
+        }
         let roots = urls.map { PathBytes(Array($0.path.utf8)) }
         state = .working("압축하는 중")
         Task {
             let next = await Self.buildZip(roots: roots, destination: destination)
             self.state = next
+        }
+    }
+
+    /// idle로 돌아가면서, 그 사이 밀린 드롭이 있으면 맨 앞의 것부터 원래 진입점을
+    /// 통해 그대로 다시 부른다. `cancel()`/`reset()`에서만 부른다 — 즉 사용자가
+    /// 확인 대화상자를 취소하거나 결과 화면의 "확인"을 눌러 **직접 그 화면을
+    /// 치운** 시점에만 다음 대기 작업이 시작된다. 자동으로 넘어가지 않는다.
+    private func returnToIdle() {
+        state = .idle
+        guard !pendingDrops.isEmpty else { return }
+        let next = pendingDrops.removeFirst()
+        switch next {
+        case .dropped(let urls):
+            handle(urls: urls)
+        case .zip(let from, let to):
+            makeZip(from: from, to: to)
+        case .archive(let url):
+            cleanArchive(at: url)
         }
     }
 
@@ -83,11 +137,15 @@ final class DropCoordinator: ObservableObject {
     /// 그 부모가 아니다. 사용자가 저장 패널에서 고른 경로에는 권한이 부여되므로
     /// 이 경로만이 확실히 동작한다.
     private func cleanArchive(at url: URL) {
+        guard case .idle = state else {
+            pendingDrops.append(.archive(url))
+            return
+        }
         let panel = NSSavePanel()
         panel.nameFieldStringValue = ZipCleaner.defaultDestination(for: url).lastPathComponent
         panel.allowedContentTypes = [.zip]
         guard panel.runModal() == .OK, let destination = panel.url else {
-            state = .idle
+            returnToIdle()
             return
         }
         state = .working("압축 파일을 정리하는 중")
