@@ -2,6 +2,11 @@
 
 맥에서 자소분리된 한글 파일명을 고쳐주는 macOS 앱.
 
+<p align="center">
+  <img src="docs/images/moa-window.png" alt="모아 창 — 흩어진 자모 ㅁ ㅗ ㅇ ㅏ 와 '여기에 놓으세요' 안내, 파일 선택·ZIP으로 묶기 버튼" width="420">
+  <img src="docs/images/moa-result.png" alt="결과 화면 — '8개를 모았습니다' 와 고쳐진 파일명 목록" width="420">
+</p>
+
 ## 이런 적 있다면
 
 파일을 보냈는데 받은 사람(윈도우)에게 이름이 이렇게 보인 적이 있다면 이 앱이 필요하다.
