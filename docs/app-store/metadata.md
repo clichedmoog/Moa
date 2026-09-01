@@ -170,3 +170,32 @@ App Store Connect 에 저장 완료:
   통과 쪽에 무게를 두지만 보장은 없다. 반려되면 설명에서 "OS 기본 도구로는
   불가능한 이유"를 더 앞세운다.
 - **Guideline 3.1.1** — 후원 메뉴는 `ReleaseMAS` 빌드에서 제외했다.
+
+## 2026-08-25 심사 반려 — Guideline 2.1(a)
+
+첫 제출이 반려됐다. 코드 문제가 아니라 **샘플 파일을 달라**는 요청이었다.
+
+> We are unable to successfully access all of the app. In order for us to
+> continue the review, we need sample files to verify all of the app features
+> and functionality. ... The sample files you provide should be hosted at a
+> location that will remain available for future reviews
+
+원인은 심사 메모가 심사관에게 터미널에서 python 명령을 쳐서 자소분리 파일을
+직접 만들라고 요구한 것이다. **이 앱의 문제는 Finder 에서 눈에 보이지 않는다** —
+NFD 이름도 Finder 는 정상으로 그린다. 그러니 심사관은 만들어주지 않으면 아무것도
+확인할 수 없고, 만드는 수고를 요구한 것 자체가 설계 실수였다.
+
+대응: 미리 만든 샘플을 저장소에 두고 고정 URL 을 심사 메모에 넣는다.
+
+  docs/app-store/moa-review-samples.zip
+  https://github.com/clichedmoog/Moa/raw/main/docs/app-store/moa-review-samples.zip
+
+샘플 구성 (폴더 이름은 영어, 안쪽 파일만 한글 NFD — 심사관이 탐색할 수 있어야 한다):
+
+  READ ME FIRST.txt                      영어 안내, 검증 명령 포함
+  1 - Drag these onto Moa/               NFD 파일 3개 + NFD 하위 폴더
+  2 - Drag this ZIP onto Moa/            Finder 압축 방식 ZIP (__MACOSX 4개, NFD 4개)
+
+검증한 것: ZIP 왕복 후에도 NFD 가 보존된다(5개). 안쪽 ZIP 이 실제로 정리 대상이다
+(UTF-8 플래그 없음 + 맥 전용 항목 4개). 둘 다 실측했다 — 보존이 안 되면 샘플이
+무용지물이므로 넘겨짚을 수 없다.
