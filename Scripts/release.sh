@@ -61,7 +61,7 @@ codesign --verify --deep --strict --verbose=2 "$APP"
 notarize_and_wait () {
     local target="$1"
     local out
-    out=$(xcrun notarytool submit "$target" --keychain-profile "$NOTARY_PROFILE" "${KEYCHAIN_ARGS[@]}" --wait 2>&1)
+    out=$(xcrun notarytool submit "$target" --keychain-profile "$NOTARY_PROFILE" ${KEYCHAIN_ARGS[@]+"${KEYCHAIN_ARGS[@]}"} --wait 2>&1)
     echo "$out"
 
     local sub_id
@@ -72,7 +72,7 @@ notarize_and_wait () {
     if [[ "$status" != "Accepted" ]]; then
         echo "!! 공증 실패: $target (status=${status:-unknown}, id=${sub_id:-unknown})"
         if [[ -n "${sub_id:-}" ]]; then
-            xcrun notarytool log "$sub_id" --keychain-profile "$NOTARY_PROFILE" "${KEYCHAIN_ARGS[@]}" "$BUILD/notary-${sub_id}.log" || true
+            xcrun notarytool log "$sub_id" --keychain-profile "$NOTARY_PROFILE" ${KEYCHAIN_ARGS[@]+"${KEYCHAIN_ARGS[@]}"} "$BUILD/notary-${sub_id}.log" || true
             echo "── 공증 로그 (notary-${sub_id}.log)"
             cat "$BUILD/notary-${sub_id}.log" || true
         fi
