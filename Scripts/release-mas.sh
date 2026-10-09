@@ -77,6 +77,14 @@ codesign -dv --verbose=2 "$APP" 2>&1 | grep -E "Authority=Apple Distribution" >/
     || { echo "   ✗ embedded.provisionprofile 없음" >&2; exit 1; }
 echo "   ✓ 아키텍처: $(lipo -archs "$APP/Contents/MacOS/Moa")"
 
+# 올린 버전·빌드 쌍은 덮어쓸 수 없다. 콘솔 대조 기준(store.config.json)과 다르면
+# 엉뚱한 번호를 올리기 전에 멈춘다.
+GOT="$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' "$APP/Contents/Info.plist") ($(/usr/libexec/PlistBuddy -c 'Print CFBundleVersion' "$APP/Contents/Info.plist"))"
+WANT="$(python3 -c 'import json,sys; c=json.load(open(sys.argv[1])); print("%s (%s)" % (c["version"], c["build"]))' "$ROOT/docs/app-store/store.config.json")"
+[ "$GOT" = "$WANT" ] \
+    && echo "   ✓ 버전 $GOT" \
+    || { echo "   ✗ 아카이브는 $GOT, docs/app-store/store.config.json 은 $WANT" >&2; exit 1; }
+
 # 후원 메뉴가 이 빌드에 남아 있으면 Guideline 3.1.1 로 반려될 수 있다.
 if strings "$APP/Contents/MacOS/Moa" | grep -q "sponsors/"; then
     echo "   ✗ 후원 링크가 MAS 빌드에 남아 있다 — #if !MAS 확인" >&2; exit 1
