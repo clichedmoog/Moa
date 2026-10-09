@@ -1,16 +1,32 @@
 {
-  "fill": "automatic",
+  "fill": {
+    "linear-gradient": [
+      "display-p3:0.57812,0.65219,0.73733,1.00000",
+      "display-p3:0.08900,0.14751,0.22890,1.00000"
+    ],
+    "orientation": {
+      "start": {
+        "x": 0.5,
+        "y": 0
+      },
+      "stop": {
+        "x": 0.5,
+        "y": 1
+      }
+    }
+  },
   "groups": [
     {
       "layers": [
         {
-          "image-name": "fg.png",
-          "name": "단청 문양"
+          "image-name": "fg-center.png",
+          "name": "꽃술"
         }
       ],
+      "name": "꽃술",
       "shadow": {
         "kind": "neutral",
-        "opacity": 0.45
+        "opacity": 0.3
       },
       "specular": true,
       "translucency": {
@@ -21,10 +37,38 @@
     {
       "layers": [
         {
-          "image-name": "bg.png",
-          "name": "석청 바탕"
+          "image-name": "fg-petals.png",
+          "name": "꽃잎"
         }
-      ]
+      ],
+      "name": "꽃잎",
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.3
+      },
+      "specular": true,
+      "translucency": {
+        "enabled": false,
+        "value": 0
+      }
+    },
+    {
+      "layers": [
+        {
+          "image-name": "fg-leaves.png",
+          "name": "잎"
+        }
+      ],
+      "name": "잎",
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.45
+      },
+      "specular": true,
+      "translucency": {
+        "enabled": false,
+        "value": 0
+      }
     }
   ],
   "supported-platforms": {
