@@ -4,10 +4,47 @@
     {
       "layers": [
         {
-          "image-name": "fg.png",
-          "name": "단청 문양"
+          "image-name": "fg-center.png",
+          "name": "꽃술"
         }
       ],
+      "name": "꽃술",
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.3
+      },
+      "specular": true,
+      "translucency": {
+        "enabled": false,
+        "value": 0
+      }
+    },
+    {
+      "layers": [
+        {
+          "image-name": "fg-petals.png",
+          "name": "꽃잎"
+        }
+      ],
+      "name": "꽃잎",
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.3
+      },
+      "specular": true,
+      "translucency": {
+        "enabled": false,
+        "value": 0
+      }
+    },
+    {
+      "layers": [
+        {
+          "image-name": "fg-leaves.png",
+          "name": "잎"
+        }
+      ],
+      "name": "잎",
       "shadow": {
         "kind": "neutral",
         "opacity": 0.45
