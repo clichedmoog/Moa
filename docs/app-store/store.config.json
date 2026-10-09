@@ -1,0 +1,76 @@
+{
+  "_comment": "모아 Mac App Store 출시 원본. 문구는 콘솔 저장값과 문자 단위로 같아야 한다 — Scripts/asc.py diff 로 확인한다.",
+  "app": {
+    "name": "모아 (Moa)",
+    "appleId": "6802254516",
+    "bundleId": "com.clichedmoog.Moa",
+    "sku": "MOA-MACOS-001",
+    "platform": "MAC_OS",
+    "primaryLocale": "ko",
+    "category": "UTILITIES",
+    "teamId": "N9LYHMUDKA",
+    "project": "MoaApp/project.yml",
+    "scheme": "Moa",
+    "configuration": "ReleaseMAS",
+    "provisioningProfile": "Moa Mac App Store",
+    "minimumMacOS": "13.0"
+  },
+  "ascApiKey": {
+    "keyId": "DF5M8R379V",
+    "issuerId": "69a6de79-892a-47e3-e053-5b8c7c11a4d1",
+    "path": "~/.appstoreconnect/private_keys/AuthKey_DF5M8R379V.p8"
+  },
+  "version": "1.0",
+  "build": "2",
+  "releaseType": "AFTER_APPROVAL",
+  "appInfo": {
+    "ko": {
+      "name": "모아 - 한글 파일명 복구",
+      "subtitle": "자소분리 고치고 윈도우용 ZIP까지",
+      "privacyPolicyUrl": "https://github.com/clichedmoog/Moa/blob/main/docs/privacy.md"
+    }
+  },
+  "listings": {
+    "ko": {
+      "description": "맥에서 만든 파일을 보냈더니 이름이 깨져서 왔다는 말, 들어보신 적 있나요?\n\nmacOS는 한글 파일명을 유니코드 NFD(풀어쓰기)로 저장해요. 맥에서는 Finder가 알아서 모아 그려주니까 티가 안 나요. 문제는 파일이 맥 밖으로 나가는 순간에만 드러나요.\n\n■ 파일을 그대로 보내면\n받는 쪽(윈도우)에는 \"ㅅㅏㅈㅣㄴ ㅁㅗㅇㅡㅁ.zip\"처럼 자모가 흩어져 보여요.\n\n■ Finder에서 \"압축\"해서 보내면\n더 나빠요. macOS 기본 압축은 ZIP의 UTF-8 표시를 세우지 않아서, 윈도우 탐색기가 이름을 CP949로 잘못 읽어요. 자모가 흩어지는 정도가 아니라 아예 읽을 수 없는 글자가 돼요.\n\n모아는 이 두 가지를 모두 해결해요.\n\n\n▷ 하는 일\n\n• 이름 고치기\n  파일이나 폴더를 창에 끌어다 놓으면 이름을 NFC(모아쓰기)로 되돌려요. 폴더는 안쪽까지 훑고, 이미 온전한 이름은 건드리지 않아요.\n\n• 윈도우에서 안 깨지는 ZIP 만들기\n  이름을 고친 뒤 UTF-8 표시를 세운 ZIP으로 내보내요. macOS가 끼워 넣는 __MACOSX, .DS_Store 같은 군더더기도 함께 빼요.\n\n• 기존 ZIP 청소하기\n  이미 만들어둔 ZIP을 떨어뜨리면 안쪽 이름을 고쳐 다시 묶어줘요.\n\n\n▷ 어디서든 부를 수 있어요\n\n• Finder에서 우클릭\n  파일을 고르고 오른쪽 버튼 → 서비스 → 모아쓰기. 앱을 열지 않아도 돼요. 보내기 직전에 한 번 눌러주면 끝이에요.\n\n• 단축어\n  \"파일명 모아쓰기\" 액션을 단축어에 넣어 자기 작업 흐름을 만들 수 있어요. 예를 들면 다운로드 폴더를 훑어 이름을 고친 다음 압축하는 식으로요.\n\n• Dock 아이콘에 바로 드롭\n\n\n▷ 안전하게 만들었어요\n\n• 개인정보를 수집하지 않아요. 네트워크 권한 자체가 없어서 macOS가 모든 연결을 차단해요.\n• 여러분이 끌어다 놓은 파일 외에는 접근할 수 없어요.\n• 파일 내용은 읽지 않아요. 이름만 고쳐요.\n• Apple Silicon과 Intel 모두 네이티브로 동작해요.\n\n\n▷ 알아두면 좋은 것\n\n이름 고치기는 APFS 볼륨에서만 유지돼요. HFS+와 exFAT으로 포맷된 외장하드나 USB는 macOS 드라이버가 파일명을 자소분리 형태로 되돌려 써요. 그런 곳으로 옮길 거라면 이름을 고치는 대신 ZIP으로 묶으세요 — ZIP 안의 이름은 파일시스템과 무관하게 그대로 가요.\n\n또 하나, 이름을 고쳐도 맥에서는 달라 보이지 않아요. 원래 Finder에는 제대로 보이고 있었으니까요. 달라지는 건 파일이 맥을 떠난 다음이에요.\n\n\n오픈소스예요. https://github.com/clichedmoog/Moa",
+      "keywords": "자소분리,자모분리,깨짐,글자깨짐,파일이름,이름복구,압축,zip,윈도우,전송,인코딩,utf8,NFC,NFD,유니코드,정규화,외장하드,폴더,파일관리",
+      "promotionalText": "맥에서 보낸 파일 이름이 윈도우에서 깨져 보인다면, macOS가 한글 파일명을 풀어쓰기로 저장하기 때문이에요. 모아가 되돌려 줘요. 윈도우에서 안 깨지는 ZIP도 만들어 주고요.",
+      "whatsNew": null,
+      "supportUrl": "https://github.com/clichedmoog/Moa/issues",
+      "marketingUrl": "https://github.com/clichedmoog/Moa"
+    }
+  },
+  "screenshots": {
+    "ko": {
+      "APP_DESKTOP": [
+        {
+          "file": "docs/app-store/screenshots/03-zip.png",
+          "ascChecksum": "d56e152a9d9175f4bbb7f38a0777af4e"
+        },
+        {
+          "file": "docs/app-store/screenshots/02-result.png",
+          "ascChecksum": "a5219e05d9728849403f8cfe3a13d446"
+        },
+        {
+          "file": "docs/app-store/screenshots/01-idle.png",
+          "ascChecksum": "f8fafdef8a1bdd0ce1cb2e777e95a72c"
+        }
+      ]
+    }
+  },
+  "review": {
+    "contactFirstName": "Myeongseok",
+    "contactLastName": "Seo",
+    "contactEmail": "tenma@mac.com",
+    "demoAccountRequired": false,
+    "notes": "SAMPLE FILES (as requested in the 2.1(a) message)\n\nAttached to this submission as \"moa-review-samples.zip\", and also hosted at:\nhttps://github.com/clichedmoog/Moa/raw/main/docs/app-store/moa-review-samples.zip\n\nThat URL is inside our public GitHub repository and will remain available for\nfuture reviews. Unzip and follow \"READ ME FIRST.txt\" inside. No account or\nlogin is needed anywhere in this app.\n\n\nWHY SAMPLE FILES ARE NECESSARY\n\nmacOS stores Korean filenames in Unicode NFD (decomposed) form. Finder renders\nNFD correctly, so a broken filename looks completely normal on a Mac. The\ndamage appears only after the file leaves the Mac - on Windows the Hangul\nletters appear scattered (\"ㅅㅏㅈㅣㄴ\" instead of \"사진\").\n\nThat is why a broken file is indistinguishable from a good one by eye, and why\nwe now provide pre-made samples instead of asking you to create any. We\napologize for not including them in the first submission.\n\n\nHOW TO VERIFY - about 2 minutes\n\nTEST 1 - Fix filenames\n  Open \"1 - Drag these onto Moa\", select all items, drag them onto the Moa\n  window. Moa reports how many it fixed and lists each old and new name.\n\n  To confirm the names really changed, run this in Terminal inside that folder,\n  before and after:\n\n  python3 -c \"import os,unicodedata; [print('NFD' if n!=unicodedata.normalize('NFC',n) else 'NFC', n) for n in os.listdir('.')]\"\n\n  Before: every line starts with NFD.  After: every line starts with NFC.\n\nTEST 2 - Right-click, without opening the app\n  Re-download the samples for fresh files. In Finder select them, then\n  right-click > Services > \"모아쓰기\". Same result.\n\nTEST 3 - Windows-safe ZIP\n  Drag \"2 - Drag this ZIP onto Moa/archive-from-finder.zip\" onto Moa and pick a\n  save location. Our output sets the ZIP UTF-8 flag (general purpose bit 11)\n  and removes the __MACOSX and ._ entries that macOS inserts.\n\nTEST 4 - Shortcuts\n  In the Shortcuts app, create a shortcut, search the action library for\n  \"모아쓰기\", add it, choose one of the sample files, and run it.\n\n\nWHAT macOS CANNOT DO ON ITS OWN\n\n- Finder has no command to change the Unicode normalization form of a filename.\n- macOS built-in compression (ditto, zip) does not set the ZIP UTF-8 flag, and\n  no setting changes this. It is why Korean filenames arrive unreadable on\n  Windows.\n- A website cannot do this: it cannot rename files in place on a user's disk.\n\n\nPRIVACY AND PERMISSIONS\n\nThe app runs in the App Sandbox and does not request the network entitlement,\nso it cannot transmit any data. It touches only files you drop on it or select.\nIt reads filenames, not file contents (except when building a ZIP).\n\nSource code: https://github.com/clichedmoog/Moa",
+    "_contactPhone": "공개 저장소라 기록하지 않는다. 콘솔 값을 유지한다."
+  },
+  "consoleOnly": {
+    "_comment": "API 로 확인할 수 없거나 이 도구가 비교하지 않는 항목. 2026-10-09 기준.",
+    "appPrivacy": "DATA_NOT_COLLECTED",
+    "ageRating": "4+ (모든 항목 없음/NONE, 광고 없음)",
+    "price": "무료 (USD 0.0)",
+    "availableInNewTerritories": true
+  }
+}
