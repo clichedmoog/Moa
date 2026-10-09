@@ -32,7 +32,7 @@
 
 ## 설치
 
-[Releases](https://github.com/clichedmoog/Moa/releases)에서 최신 `Moa-1.0.dmg`를 받아 연다.
+[Releases](https://github.com/clichedmoog/Moa/releases)에서 최신 `Moa-1.0.1.dmg`를 받아 연다.
 
 Developer ID로 서명하고 공증(notarization)까지 마쳤으므로 첫 실행에 보안 경고 없이 그냥 열린다. Apple Silicon과 Intel 모두 네이티브로 동작한다 (로제타 불필요).
 

@@ -15,7 +15,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 APP_NAME="Moa"
-VERSION="1.0"
+VERSION="1.0.1"
 TEAM_ID="N9LYHMUDKA"
 SIGN_ID="Developer ID Application: Myeongseok SEO (${TEAM_ID})"
 NOTARY_PROFILE="MOA_NOTARY"
