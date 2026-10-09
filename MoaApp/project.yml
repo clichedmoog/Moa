@@ -29,7 +29,6 @@ targets:
     info:
       path: Moa/Info.plist
       properties:
-        CFBundleIconFile: AppIcon
         CFBundleName: Moa
         CFBundleDisplayName: Moa
         CFBundleShortVersionString: "1.0"
@@ -72,6 +71,11 @@ targets:
         CODE_SIGN_STYLE: Automatic
         CODE_SIGN_IDENTITY: "-"
         CODE_SIGN_ENTITLEMENTS: Moa/Moa.entitlements
+        # 앱 아이콘은 Icon Composer 원본(Moa.icon)이다. 이름이 파일명과 같아야 actool 이
+        # 집어 든다 — XcodeGen 기본값 AppIcon 으로 두면 .icon 을 건너뛴다. macOS 26 이상은
+        # Liquid Glass 아이콘(다크·투명·틴트)을, 그 이전 macOS 는 actool 이 같은 원본에서
+        # 만든 Moa.icns 를 쓴다. Info.plist 의 CFBundleIconFile·CFBundleIconName 도 actool 이 넣는다.
+        ASSETCATALOG_COMPILER_APPICON_NAME: Moa
       configs:
         Release:
           CODE_SIGN_STYLE: Manual
