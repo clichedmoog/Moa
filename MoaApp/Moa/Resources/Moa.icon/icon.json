@@ -1,5 +1,20 @@
 {
-  "fill": "automatic",
+  "fill": {
+    "linear-gradient": [
+      "display-p3:0.57812,0.65219,0.73733,1.00000",
+      "display-p3:0.08900,0.14751,0.22890,1.00000"
+    ],
+    "orientation": {
+      "start": {
+        "x": 0.5,
+        "y": 0
+      },
+      "stop": {
+        "x": 0.5,
+        "y": 1
+      }
+    }
+  },
   "groups": [
     {
       "layers": [
@@ -54,14 +69,6 @@
         "enabled": false,
         "value": 0
       }
-    },
-    {
-      "layers": [
-        {
-          "image-name": "bg.png",
-          "name": "석청 바탕"
-        }
-      ]
     }
   ],
   "supported-platforms": {
