@@ -53,7 +53,16 @@ targets:
               - public.file-url
             NSRequiredContext:
               NSTextContent: FilePath
+        # Dock 드롭을 받으려면 모든 항목(public.item)을 선언해야 하지만, Rank None 이라
+        # "다음으로 열기"에는 나오지 않는다. ZIP 만은 "열어서 정리한다"가 앱이 하는 일과
+        # 맞아서 Alternate 로 따로 선언해 그 목록에 넣는다. Alternate 는 기본 앱을 빼앗지
+        # 않는다 — 더블클릭은 그대로 아카이브 유틸리티로 간다.
         CFBundleDocumentTypes:
+          - CFBundleTypeName: ZIP Archive
+            CFBundleTypeRole: Viewer
+            LSItemContentTypes:
+              - public.zip-archive
+            LSHandlerRank: Alternate
           - CFBundleTypeName: All Documents
             CFBundleTypeRole: Editor
             LSItemContentTypes:
