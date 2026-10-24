@@ -4,6 +4,9 @@ options:
   deploymentTarget:
     macOS: "13.0"
   createIntermediateGroups: true
+  # 화면 문구가 코드에 한국어로 들어 있다. 기본값 en 으로 두면 App Store 가 지원 언어를
+  # "영어"로 표시한다(.lproj 가 없으면 개발 지역을 보고 정한다).
+  developmentLanguage: ko
 
 # Release 와 ReleaseMAS 는 같은 코드를 다른 서명 체계로 낸다.
 #   Release    — Developer ID + 공증, GitHub Release 로 직접 배포
@@ -31,6 +34,9 @@ targets:
       properties:
         CFBundleName: Moa
         CFBundleDisplayName: Moa
+        CFBundleDevelopmentRegion: ko
+        CFBundleLocalizations:
+          - ko
         CFBundleShortVersionString: "1.0.2"
         CFBundleVersion: "4"
         LSMinimumSystemVersion: "13.0"

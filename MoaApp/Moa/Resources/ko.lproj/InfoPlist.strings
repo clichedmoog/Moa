@@ -1,0 +1,4 @@
+/* 번들에 ko.lproj 가 있어야 App Store 가 지원 언어를 "한국어"로 표시한다.
+   앱 이름은 다른 곳과 같이 Moa 로 둔다. */
+"CFBundleDisplayName" = "Moa";
+"CFBundleName" = "Moa";
